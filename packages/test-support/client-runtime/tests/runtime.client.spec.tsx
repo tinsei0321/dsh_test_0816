@@ -383,12 +383,15 @@ describe('workspaces', () => {
     await expect(runtime.workspaces.listDirectory()).resolves.toMatchObject({ path: '/home/test', entries: [] })
     await expect(runtime.workspaces.listDirectory('/home/test')).resolves.toMatchObject({ path: '/home/test' })
     await expect(runtime.workspaces.createDirectory('/home/test', 'fresh')).resolves.toBe('/home/test/fresh')
+    // The tree listing records and serves an empty level by default.
+    await expect(runtime.workspaces.listTreeEntries('/home/test')).resolves.toEqual({ path: '/home/test', entries: [], truncated: false })
     // The recorded signal seat mirrors the production face (undefined here;
     // cancellation tests pass and observe a real one).
     expect(runtime.workspaces.calls).toEqual([
       { method: 'listDirectory', args: [undefined, undefined] },
       { method: 'listDirectory', args: ['/home/test', undefined] },
       { method: 'createDirectory', args: ['/home/test', 'fresh'] },
+      { method: 'listTreeEntries', args: ['/home/test', undefined] },
     ])
     // Stubs replace the defaults like every sibling method.
     const listing = { path: '/x', home: '/x', crumbs: [], entries: [] }
@@ -400,6 +403,11 @@ describe('workspaces', () => {
     // The stub receives the signal too, like the production face gives the wire.
     expect(listStub).toHaveBeenLastCalledWith('/x', scan.signal)
     await expect(runtime.workspaces.createDirectory('/x', 'made')).resolves.toBe('/x/made')
+    const treeListing = { path: '/x', entries: [{ name: 'a.ts', path: '/x/a.ts', kind: 'file', hidden: false }], truncated: false }
+    const treeStub = vi.fn(() => Promise.resolve(treeListing as never))
+    runtime.workspaces.stub('listTreeEntries', treeStub)
+    await expect(runtime.workspaces.listTreeEntries('/x', scan.signal)).resolves.toBe(treeListing)
+    expect(treeStub).toHaveBeenLastCalledWith('/x', scan.signal)
     await runtime.dispose()
   })
 })

@@ -1,15 +1,17 @@
 /**
  * Browse backend of the directory-picker seam: registers `ctx.directoryPicker`
- * with the `browse` capability — one-level directory listing and child-directory
- * creation over the host filesystem via Node's stdlib (which already carries
- * the per-OS adaptation). Nothing renders on the host display, so this backend
- * serves remote clients the dialog backend cannot. Policy decisions (hidden
- * entries flagged but returned, symlinks followed, whole-filesystem scope) are
- * recorded in the directory-picker seam Agent Note.
+ * with the `browse` capability — one-level directory listing (browser rows
+ * and tree slices), and child-directory creation over the host filesystem via
+ * Node's stdlib (which already carries the per-OS adaptation). Nothing
+ * renders on the host display, so this backend serves remote clients the
+ * dialog backend cannot. Policy decisions (hidden entries flagged but
+ * returned, symlinks followed, whole-filesystem scope) are recorded in the
+ * directory-picker seam Agent Note.
  * @module @deepseek-ai/dsh-host-directory-picker-browse
  */
 
 import { mkdir, opendir, stat } from 'node:fs/promises'
+import type { Dirent } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join, posix, resolve, win32 } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -18,7 +20,7 @@ import {
   DirectoryPicker, DirectoryPickerError,
 } from '@deepseek-ai/dsh-host-directory-picker'
 import type {
-  DirectoryEntry, DirectoryListing, DirectoryPickerCapability,
+  DirectoryEntry, DirectoryListing, DirectoryPickerCapability, TreeEntry, TreeListing,
 } from '@deepseek-ai/dsh-host-directory-picker'
 
 /**
@@ -59,7 +61,9 @@ export interface ListingCandidate {
   name: string
   /** Dirent says directory (no probe needed). */
   isDirectory: boolean
-  /** Dirent says symlink (enterability needs a stat probe). */
+  /** Dirent says file (no probe needed). */
+  isFile: boolean
+  /** Dirent says symlink (the row kind needs a stat probe). */
   isSymbolicLink: boolean
 }
 
@@ -177,6 +181,39 @@ async function directoryRow(
   return { name, path, hidden: name.startsWith('.') }
 }
 
+/**
+ * One tree row for a dirent: files and directories pass through without a
+ * probe; a symlink resolves its kind through a stat probe, and a broken link
+ * or a target that is neither file nor directory yields no row (the tree
+ * shows what can be opened, and a broken link cannot).
+ */
+async function treeRow(
+  parent: string, name: string, isDirectory: boolean, isFile: boolean, signal: AbortSignal | undefined,
+): Promise<TreeEntry | null> {
+  const path = join(parent, name)
+  // Plain files and directories pass through without a probe (the scan's
+  // predicate admits only these and symlinks). Same hidden convention as
+  // directoryRow (comment there).
+  if (isDirectory) return { name, path, kind: 'directory', hidden: name.startsWith('.') }
+  if (isFile) return { name, path, kind: 'file', hidden: name.startsWith('.') }
+  // Symlink: resolve the kind through a stat probe; a broken link or a
+  // target that is neither file nor directory yields no row (the tree shows
+  // what can be opened, and a broken link cannot).
+  try {
+    // The probe races the caller too: a symlink target on a stalled
+    // network filesystem must not keep a departed caller's request alive.
+    const target = await raceAbort(stat(path), signal)
+    if (!target.isDirectory() && !target.isFile()) return null
+    return { name, path, kind: target.isDirectory() ? 'directory' : 'file', hidden: name.startsWith('.') }
+  } catch {
+    /* v8 ignore next 2 -- an abort landing mid-probe needs a stalled stat; the
+       per-candidate check in listTreeEntries covers the settled path. */
+    if (signal?.aborted) throw asError(signal.reason)
+    // Broken or cyclic symlink: stat is the probe, failure means "no row".
+    return null
+  }
+}
+
 /** Validated plugin configuration. */
 export interface Config {
   /** Complete-result bound of one listing level; see {@link BrowseDirectoryPicker.Config}. */
@@ -186,11 +223,11 @@ export interface Config {
 /** The `ctx.directoryPicker` browse implementation (stable capability object per service life). */
 export default class BrowseDirectoryPicker extends DirectoryPicker {
   /**
-   * `maxEntries` bounds the complete listing level a single `list` call may
-   * materialize and put on the wire: at most this many child-directory rows
-   * (hidden rows included), with `truncated` flagging a cut level. The
-   * default follows GitHub's web UI, which truncates directory listings at
-   * 1,000 entries.
+   * `maxEntries` bounds the complete listing level a single `list` or
+   * `listTreeEntries` call may materialize and put on the wire: at most this
+   * many rows (hidden rows included), with `truncated` flagging a cut level.
+   * The default follows GitHub's web UI, which truncates directory listings
+   * at 1,000 entries.
    */
   static Config: z<Config> = z.object({
     maxEntries: z.natural().min(1).default(1000),
@@ -199,6 +236,7 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
   private readonly browseCapability: DirectoryPickerCapability = {
     kind: 'browse',
     list: (path, signal) => this.list(path, signal),
+    listTreeEntries: (path, signal) => this.listTreeEntries(path, signal),
     createDirectory: (path, name) => this.createDirectory(path, name),
   }
 
@@ -214,23 +252,26 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
     return this.browseCapability
   }
 
-  private async list(path?: string, signal?: AbortSignal): Promise<DirectoryListing> {
-    const home = homedir()
-    // The seam contract takes fully qualified paths only; resolve() would
-    // silently rebase a relative or empty wire value under the host process
-    // cwd (or, for rooted drive-less Windows forms, its current drive).
-    if (path !== undefined && !fullyQualified(path)) {
-      throw new DirectoryPickerError('directory-unreadable', path, `cannot list "${path}": not a fully qualified path`)
-    }
-    const target = resolve(path ?? home)
-    // Stream the level (opendir, one dirent at a time) into a name-sorted
-    // window of maxEntries + 1 candidates: memory stays bounded no matter how
-    // many children the directory holds, the window keeps the name-sorted
-    // head, and the +1 slot lets an in-window extra row prove the cut. A
-    // window candidate that turns out non-enterable (broken symlink) is not
-    // backfilled from beyond the window — an eviction already marks the
-    // level truncated, which stays the honest answer.
-    const keep = this.config.maxEntries + 1
+  /**
+   * Stream one level (opendir, one dirent at a time) into a name-sorted
+   * window of `keep` candidates: memory stays bounded no matter how many
+   * children the directory holds, the window keeps the name-sorted head, and
+   * the caller's +1 slot lets an in-window extra row prove the cut. A window
+   * candidate that later turns out unusable (broken symlink) is not
+   * backfilled from beyond the window — an eviction already marks the level
+   * truncated, which stays the honest answer. `include` keeps candidates
+   * that cannot become rows from contending for the window.
+   * @param target - fully qualified, already fenced directory to scan.
+   * @param signal - caller lifetime; every filesystem await races it.
+   * @param keep - the window bound (callers pass maxEntries + 1).
+   * @param include - candidate predicate over the streamed dirent.
+   * @returns the window plus whether any candidate was evicted.
+   * @throws {DirectoryPickerError} `directory-unreadable` for a filesystem
+   * failure; an abort rethrows the caller's own reason untouched.
+   */
+  private async scanLevel(
+    target: string, signal: AbortSignal | undefined, keep: number, include: (dirent: Dirent) => boolean,
+  ): Promise<{ window: ListingCandidate[]; evicted: boolean }> {
     const window: ListingCandidate[] = []
     let evicted = false
     try {
@@ -254,10 +295,13 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
         for (;;) {
           const dirent = await raceAbort(level.read(), signal)
           if (dirent === null) break
-          // Only rows a browser could enter contend for the window; dirent
-          // says "directory" outright, a symlink needs the later stat probe.
-          if (!dirent.isDirectory() && !dirent.isSymbolicLink()) continue
-          const candidate = { name: dirent.name, isDirectory: dirent.isDirectory(), isSymbolicLink: dirent.isSymbolicLink() }
+          if (!include(dirent)) continue
+          const candidate = {
+            name: dirent.name,
+            isDirectory: dirent.isDirectory(),
+            isFile: dirent.isFile(),
+            isSymbolicLink: dirent.isSymbolicLink(),
+          }
           if (boundedInsert(window, candidate, keep)) evicted = true
         }
       } finally {
@@ -279,21 +323,81 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
       signal?.throwIfAborted()
       throw new DirectoryPickerError('directory-unreadable', target, `cannot list ${target}: ${messageOf(error)}`)
     }
-    const entries: DirectoryEntry[] = []
+    return { window, evicted }
+  }
+
+  /**
+   * Turn a scanned window into result rows through one probe per candidate,
+   * enforcing the complete-result bound: at most `maxEntries` rows, with a
+   * cut whenever the scan evicted candidates or an unusable candidate fell
+   * inside the window.
+   * @param signal - caller lifetime; a departed caller stops before the next probe.
+   * @param window - the name-sorted scanned window.
+   * @param evicted - whether the scan dropped candidates beyond the window.
+   * @param rowOf - the per-candidate row probe (null skips the candidate).
+   * @returns the rows and the final truncated flag.
+   */
+  private async collectRows<T>(
+    signal: AbortSignal | undefined, window: readonly ListingCandidate[], evicted: boolean,
+    rowOf: (candidate: ListingCandidate) => Promise<T | null>,
+  ): Promise<{ rows: T[]; truncated: boolean }> {
+    const rows: T[] = []
     let truncated = evicted
     for (const candidate of window) {
-      // A caller that departed between reads and probes stops before the
-      // next probe (each probe's own await is raced inside directoryRow).
       signal?.throwIfAborted()
-      const row = await directoryRow(target, candidate.name, candidate.isDirectory, candidate.isSymbolicLink, signal)
+      const row = await rowOf(candidate)
       if (row === null) continue
-      if (entries.length === this.config.maxEntries) {
+      if (rows.length === this.config.maxEntries) {
         truncated = true
         break
       }
-      entries.push(row)
+      rows.push(row)
     }
+    return { rows, truncated }
+  }
+
+  private async list(path?: string, signal?: AbortSignal): Promise<DirectoryListing> {
+    const home = homedir()
+    // The seam contract takes fully qualified paths only; resolve() would
+    // silently rebase a relative or empty wire value under the host process
+    // cwd (or, for rooted drive-less Windows forms, its current drive).
+    if (path !== undefined && !fullyQualified(path)) {
+      throw new DirectoryPickerError('directory-unreadable', path, `cannot list "${path}": not a fully qualified path`)
+    }
+    const target = resolve(path ?? home)
+    // Only rows a browser could enter contend for the window; a dirent that
+    // says "directory" outright needs no probe, a symlink needs the later
+    // stat probe.
+    const { window, evicted } = await this.scanLevel(
+      target, signal, this.config.maxEntries + 1,
+      dirent => dirent.isDirectory() || dirent.isSymbolicLink(),
+    )
+    const { rows: entries, truncated } = await this.collectRows(
+      signal, window, evicted,
+      candidate => directoryRow(target, candidate.name, candidate.isDirectory, candidate.isSymbolicLink, signal),
+    )
     return { path: target, home, crumbs: ancestryCrumbs(target), entries, truncated }
+  }
+
+  private async listTreeEntries(path: string, signal?: AbortSignal): Promise<TreeListing> {
+    // Same fully-qualified fence as list; unlike list, the tree's root is
+    // caller-owned, so there is no home default.
+    if (!fullyQualified(path)) {
+      throw new DirectoryPickerError('directory-unreadable', path, `cannot list "${path}": not a fully qualified path`)
+    }
+    const target = resolve(path)
+    // Files and directories contend for the window together (a symlink's
+    // kind still needs the later stat probe); other dirent kinds (sockets,
+    // FIFOs) can never become rows.
+    const { window, evicted } = await this.scanLevel(
+      target, signal, this.config.maxEntries + 1,
+      dirent => dirent.isDirectory() || dirent.isFile() || dirent.isSymbolicLink(),
+    )
+    const { rows: entries, truncated } = await this.collectRows(
+      signal, window, evicted,
+      candidate => treeRow(target, candidate.name, candidate.isDirectory, candidate.isFile, signal),
+    )
+    return { path: target, entries, truncated }
   }
 
   private async createDirectory(path: string, name: string): Promise<string> {

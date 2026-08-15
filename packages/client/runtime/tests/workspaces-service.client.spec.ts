@@ -349,6 +349,26 @@ describe('WorkspaceRuntime', () => {
     await expect(workspaces.createDirectory('/home/u', 'fresh')).rejects.toMatchObject({ rpcError: { code: 'directory-exists' } })
   })
 
+  it('passes tree listings through the browse wire with the caller signal, wrapping business failures', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const workspaces = new WorkspaceRuntime(ctx, api, new SessionRuntime(ctx, api, fakeRemote()))
+    const listing = {
+      path: '/home/u',
+      entries: [{ name: 'src', path: '/home/u/src', kind: 'directory' as const, hidden: false }],
+      truncated: false,
+    }
+    api.onListTreeEntries = () => Promise.resolve(ok(listing))
+    const controller = new AbortController()
+    await expect(workspaces.listTreeEntries('/home/u', controller.signal)).resolves.toEqual(listing)
+    expect(api.callsOf('host.listTreeEntries')).toEqual([{ path: '/home/u' }])
+    expect(api.lastTreeSignal).toBe(controller.signal)
+    api.onListTreeEntries = () => Promise.resolve(err({ code: 'directory-unreadable', message: 'denied', details: { path: '/x' } }))
+    const failure = workspaces.listTreeEntries('/x')
+    await expect(failure).rejects.toBeInstanceOf(DirectoryBrowseError)
+    await expect(failure).rejects.toMatchObject({ rpcError: { code: 'directory-unreadable' } })
+  })
+
   it('opens a filesystem path through the host without local state', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()

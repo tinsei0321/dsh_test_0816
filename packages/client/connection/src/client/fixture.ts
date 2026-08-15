@@ -1585,6 +1585,14 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     const name = path.slice(path.lastIndexOf('/') + 1)
     return directoryTree.get(parent)?.includes(name) === true ? [] : undefined
   }
+  // File children per level, the directory tree's counterpart: listDirectory
+  // serves directories only, listTreeEntries unions both. Dot-prefixed names
+  // exercise the hidden flag the host backend computes.
+  const fileTree = new Map<string, string[]>([
+    [FIXTURE_HOME, ['README.md', '.gitignore']],
+    [`${FIXTURE_HOME}/Documents/project`, ['index.ts', 'package.json']],
+  ])
+  const filesOf = (path: string): string[] => fileTree.get(path) ?? []
   const crumbsOf = (path: string): { name: string; path: string; hidden: boolean }[] => {
     const crumbs = [{ name: '/', path: '/', hidden: false }]
     let acc = ''
@@ -2545,6 +2553,24 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           truncated: false,
         })
       },
+      listTreeEntries: (request) => {
+        const target = request.payload.path
+        const children = childrenOf(target)
+        if (children === undefined) {
+          return err(request, { code: 'directory-unreadable', message: `cannot list ${target}: not in the fixture tree`, details: { path: target } })
+        }
+        const childPath = (name: string): string => target === '/' ? `/${name}` : `${target}/${name}`
+        const entries = [
+          ...children.map(name => ({ name, path: childPath(name), kind: 'directory' as const, hidden: name.startsWith('.') })),
+          ...filesOf(target).map(name => ({ name, path: childPath(name), kind: 'file' as const, hidden: name.startsWith('.') })),
+        ].sort((a, b) => a.name.localeCompare(b.name))
+        return ok(request, {
+          path: target,
+          entries,
+          // The fixture tree is tiny; no level ever reaches a backend bound.
+          truncated: false,
+        })
+      },
       createDirectory: (request) => {
         const parent = request.payload.path
         const children = childrenOf(parent)
@@ -3096,6 +3122,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'host.describe': return this.api.host.describe(request)
       case 'host.pickDirectory': return this.api.host.pickDirectory(request, new AbortController().signal)
       case 'host.listDirectory': return this.api.host.listDirectory(request, new AbortController().signal)
+      case 'host.listTreeEntries': return this.api.host.listTreeEntries(request, new AbortController().signal)
       case 'host.createDirectory': return this.api.host.createDirectory(request)
       case 'host.openPath': return this.api.host.openPath(request, new AbortController().signal)
       case 'workspace.list': return this.api.workspace.list(request)

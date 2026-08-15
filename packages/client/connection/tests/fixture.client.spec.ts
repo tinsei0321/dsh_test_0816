@@ -543,6 +543,31 @@ describe('createFixtureApi', () => {
     expect(root.result.value.entries).toContainEqual({ name: 'srv', path: '/srv', hidden: false })
   })
 
+  it('listTreeEntries unions directory and file children with kinds and hidden flags', async () => {
+    const api = createFixtureApi()
+    const home = await api.host.listTreeEntries(req({ path: '/home/fixture' }), new AbortController().signal)
+    if (!home.result.ok) throw new Error('tree list failed')
+    expect(home.result.value).toEqual({
+      path: '/home/fixture',
+      entries: [
+        { name: '.config', path: '/home/fixture/.config', kind: 'directory', hidden: true },
+        { name: '.gitignore', path: '/home/fixture/.gitignore', kind: 'file', hidden: true },
+        { name: 'Documents', path: '/home/fixture/Documents', kind: 'directory', hidden: false },
+        { name: 'Downloads', path: '/home/fixture/Downloads', kind: 'directory', hidden: false },
+        { name: 'README.md', path: '/home/fixture/README.md', kind: 'file', hidden: false },
+      ],
+      truncated: false,
+    })
+    const project = await api.host.listTreeEntries(req({ path: '/home/fixture/Documents/project' }), new AbortController().signal)
+    if (!project.result.ok) throw new Error('project tree list failed')
+    expect(project.result.value.entries).toEqual([
+      { name: 'index.ts', path: '/home/fixture/Documents/project/index.ts', kind: 'file', hidden: false },
+      { name: 'package.json', path: '/home/fixture/Documents/project/package.json', kind: 'file', hidden: false },
+    ])
+    const missing = await api.host.listTreeEntries(req({ path: '/no-such-dir' }), new AbortController().signal)
+    expect(missing.result).toMatchObject({ ok: false, error: { code: 'directory-unreadable' } })
+  })
+
   it('workspace.list serves the resident account and create reuses on path collision', async () => {
     const api = createFixtureApi()
     const listed = await api.workspace.list(req({}))

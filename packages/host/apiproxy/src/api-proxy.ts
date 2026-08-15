@@ -99,6 +99,7 @@ import type {
 } from '@deepseek-ai/dsh-user-questions'
 import { UserQuestionError } from '@deepseek-ai/dsh-user-questions'
 import { DirectoryPickerError } from '@deepseek-ai/dsh-host-directory-picker'
+import type { DirectoryPickerBrowseCapability } from '@deepseek-ai/dsh-host-directory-picker'
 import {
   ApiRemoteSessionNotFound as SessionNotFound,
   ApiRemoteSubagentSessionOwnership as SubagentSessionOwnership,
@@ -630,6 +631,39 @@ function directoryError(error: unknown): RpcError {
     return { code: error.code, message: error.message, details: { path: error.path } }
   }
   return { code: 'internal', message: error instanceof Error ? error.message : String(error), details: {} }
+}
+
+/**
+ * Run one browse listing RPC through the shared plumbing: the browse-capability
+ * gate, the caller-abort mapping (an abort is the caller's own timeout or
+ * disconnect, not a server failure), and the typed-error mapping. `list` and
+ * `listTreeEntries` share every step; only the capability call differs.
+ */
+async function runBrowseListing<T>(
+  ctx: Context,
+  request: RpcRequest<unknown>,
+  method: string,
+  signal: AbortSignal,
+  run: (capability: DirectoryPickerBrowseCapability) => Promise<T>,
+): Promise<RpcResponse<T>> {
+  const capability = ctx.directoryPicker.capability()
+  if (capability.kind !== 'browse') {
+    return err(request, {
+      code: 'directory-picker-unavailable',
+      message: `${method} needs the browse capability; the composed picker serves "${capability.kind}"`,
+      details: { capability: capability.kind },
+    })
+  }
+  try {
+    // The carrier's signal follows the caller: a disconnect or timeout
+    // stops the backend's directory scan instead of outliving it.
+    return ok(request, await run(capability))
+  } catch (error: unknown) {
+    if (signal.aborted) {
+      return err(request, { code: 'cancelled', message: 'directory listing was aborted', details: {} })
+    }
+    return err(request, directoryError(error))
+  }
 }
 
 /** Resolved Agent model and project-directory defaults consumed by the API implementation. */
@@ -2967,26 +3001,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       async listDirectory(request, signal) {
-        const capability = ctx.directoryPicker.capability()
-        if (capability.kind !== 'browse') {
-          return err(request, {
-            code: 'directory-picker-unavailable',
-            message: `host.listDirectory needs the browse capability; the composed picker serves "${capability.kind}"`,
-            details: { capability: capability.kind },
-          })
-        }
-        try {
-          // The carrier's signal follows the caller: a disconnect or timeout
-          // stops the backend's directory scan instead of outliving it.
-          return ok(request, await capability.list(request.payload.path, signal))
-        } catch (error: unknown) {
-          // An abort is the caller's own timeout/disconnect, not a server
-          // failure — same code pickDirectory and command.execute report.
-          if (signal.aborted) {
-            return err(request, { code: 'cancelled', message: 'directory listing was aborted', details: {} })
-          }
-          return err(request, directoryError(error))
-        }
+        return runBrowseListing(ctx, request, 'host.listDirectory', signal, capability => capability.list(request.payload.path, signal))
+      },
+
+      async listTreeEntries(request, signal) {
+        return runBrowseListing(ctx, request, 'host.listTreeEntries', signal, capability => capability.listTreeEntries(request.payload.path, signal))
       },
 
       async createDirectory(request) {

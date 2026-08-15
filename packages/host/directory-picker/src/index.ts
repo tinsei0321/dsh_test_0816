@@ -55,6 +55,35 @@ export interface DirectoryListing {
   truncated: boolean
 }
 
+/** One tree row: a file or a directory child of a listed level. */
+export interface TreeEntry {
+  /** Base name shown in a tree row. */
+  name: string
+  /** Absolute host path — clients never join path segments themselves. */
+  path: string
+  /** Whether the row expands (directory) or opens (file); symlinks resolve to their target kind. */
+  kind: 'file' | 'directory'
+  /** Hidden by the host platform's convention (dot-prefixed on POSIX); the client owns whether to show it. */
+  hidden: boolean
+}
+
+/**
+ * One directory level as a flat tree slice: every child with its kind, no
+ * ancestry — the tree's root is owned by the caller.
+ */
+export interface TreeListing {
+  /** Absolute path of the listed directory. */
+  path: string
+  /** Direct children (files and directories), name-sorted. */
+  entries: TreeEntry[]
+  /**
+   * True when the backend cut `entries` at its complete-result bound: the
+   * level has more children than reported, and the missing rows are the
+   * name-sorted tail (hidden rows count toward the bound).
+   */
+  truncated: boolean
+}
+
 /**
  * The browse interaction: listing/creation primitives an in-app browser
  * drives one level at a time. Works for remote clients — nothing renders on
@@ -75,6 +104,21 @@ export interface DirectoryPickerBrowseCapability {
    * Windows, its current drive) or cannot be listed.
    */
   list(path?: string, signal?: AbortSignal): Promise<DirectoryListing>
+  /**
+   * List one directory level for a tree: files and directories together, no
+   * ancestry (the tree's root is caller-owned, so unlike `list` there is no
+   * home default).
+   * @param path - absolute directory to list.
+   * @param signal - caller lifetime; abort stops the scan (a stalled network
+   * directory must not outlive a disconnected caller) and rejects with the
+   * abort reason.
+   * @returns the level's children with their kinds; backends bound the
+   * complete result, and a cut level reports `truncated`.
+   * @throws {DirectoryPickerError} `directory-unreadable` when the target is not fully
+   * qualified (a wire value must never resolve against the host cwd or, on
+   * Windows, its current drive) or cannot be listed.
+   */
+  listTreeEntries(path: string, signal?: AbortSignal): Promise<TreeListing>
   /**
    * Create one child directory under an existing parent.
    * @param path - absolute existing parent directory.

@@ -153,6 +153,19 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       async listDirectory(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { path: '/w', home: '/w', crumbs: [{ name: '/', path: '/', hidden: false }], entries: [], truncated: false } } }
       },
+      async listTreeEntries(request) {
+        return {
+          rpcId: request.rpcId,
+          result: {
+            ok: true,
+            value: {
+              path: request.payload.path,
+              entries: [{ name: 'README.md', path: `${request.payload.path}/README.md`, kind: 'file', hidden: false }],
+              truncated: false,
+            },
+          },
+        }
+      },
       async createDirectory(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { path: '/w/new' } } }
       },
@@ -410,6 +423,19 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     expect(home.result).toMatchObject({ ok: true, value: { home: '/w' } })
     const created = await c.host.createDirectory({ path: '/w', name: 'fresh' })
     expect(created.result).toEqual({ ok: true, value: { path: '/w/new' } })
+  })
+
+  it('round-trips the tree listing call through the wire form', async () => {
+    const c = client()
+    const listed = await c.host.listTreeEntries({ path: '/w' })
+    expect(listed.result).toEqual({
+      ok: true,
+      value: {
+        path: '/w',
+        entries: [{ name: 'README.md', path: '/w/README.md', kind: 'file', hidden: false }],
+        truncated: false,
+      },
+    })
   })
 
   it('round-trips host.openPath through the wire form', async () => {

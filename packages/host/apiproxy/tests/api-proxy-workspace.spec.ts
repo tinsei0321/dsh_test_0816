@@ -158,7 +158,7 @@ describe('host.pickDirectory', () => {
   })
 })
 
-/** Canned browse capability: one listing, one created path, typed failures on demand. */
+/** Canned browse capability: one listing, one tree level, one created path, typed failures on demand. */
 const BROWSE_STUB: DirectoryPickerCapability = {
   kind: 'browse',
   list: async (path) => {
@@ -169,6 +169,17 @@ const BROWSE_STUB: DirectoryPickerCapability = {
       home: '/home/user',
       crumbs: [{ name: '/', path: '/', hidden: false }],
       entries: [{ name: 'projects', path: `${target}/projects`, hidden: false }],
+      truncated: false,
+    }
+  },
+  listTreeEntries: async (path) => {
+    if (path === '/denied') throw new DirectoryPickerError('directory-unreadable', '/denied', 'cannot list /denied')
+    return {
+      path,
+      entries: [
+        { name: 'src', path: `${path}/src`, kind: 'directory', hidden: false },
+        { name: 'README.md', path: `${path}/README.md`, kind: 'file', hidden: false },
+      ],
       truncated: false,
     }
   },
@@ -209,6 +220,7 @@ describe('host.listDirectory / host.createDirectory', () => {
       list: (_path, signal) => new Promise((_resolve, reject) => {
         signal?.addEventListener('abort', () => { reject(new Error('scan aborted')) }, { once: true })
       }),
+      listTreeEntries: async () => ({ path: '/home/user', entries: [], truncated: false }),
       createDirectory: async () => '/never',
     })
     const abort = new AbortController()
@@ -223,6 +235,53 @@ describe('host.listDirectory / host.createDirectory', () => {
       ok: false, error: { code: 'directory-picker-unavailable', details: { capability: 'native' } },
     })
     expect((await api.host.createDirectory(request({ path: '/x', name: 'y' }))).result).toMatchObject({
+      ok: false, error: { code: 'directory-picker-unavailable', details: { capability: 'native' } },
+    })
+  })
+})
+
+describe('host.listTreeEntries', () => {
+  it('serves tree levels through the browse capability', async () => {
+    const { api } = await harness(undefined, BROWSE_STUB)
+    const listed = await api.host.listTreeEntries(request({ path: '/home/user/projects' }), new AbortController().signal)
+    expect(listed.result).toEqual({
+      ok: true,
+      value: {
+        path: '/home/user/projects',
+        entries: [
+          { name: 'src', path: '/home/user/projects/src', kind: 'directory', hidden: false },
+          { name: 'README.md', path: '/home/user/projects/README.md', kind: 'file', hidden: false },
+        ],
+        truncated: false,
+      },
+    })
+  })
+
+  it('maps typed picker failures onto the wire error codes', async () => {
+    const { api } = await harness(undefined, BROWSE_STUB)
+    expect((await api.host.listTreeEntries(request({ path: '/denied' }), new AbortController().signal)).result).toMatchObject({
+      ok: false, error: { code: 'directory-unreadable', details: { path: '/denied' } },
+    })
+  })
+
+  it('reports an aborted tree scan as cancelled', async () => {
+    const { api } = await harness(undefined, {
+      kind: 'browse',
+      list: async () => ({ path: '/home/user', home: '/home/user', crumbs: [], entries: [], truncated: false }),
+      listTreeEntries: (_path, signal) => new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => { reject(new Error('scan aborted')) }, { once: true })
+      }),
+      createDirectory: async () => '/never',
+    })
+    const abort = new AbortController()
+    const pending = api.host.listTreeEntries(request({ path: '/home/user' }), abort.signal)
+    abort.abort()
+    expect((await pending).result).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+  })
+
+  it('refuses the tree RPC under a native composition', async () => {
+    const { api } = await harness()
+    expect((await api.host.listTreeEntries(request({ path: '/x' }), new AbortController().signal)).result).toMatchObject({
       ok: false, error: { code: 'directory-picker-unavailable', details: { capability: 'native' } },
     })
   })

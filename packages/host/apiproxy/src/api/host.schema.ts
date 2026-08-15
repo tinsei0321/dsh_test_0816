@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod'
-import type { DirectoryEntry } from './host.ts'
+import type { DirectoryEntry, TreeEntry } from './host.ts'
 import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import type { Wire } from './rpc.schema.ts'
 
@@ -48,6 +48,26 @@ export const hostListDirectoryValueSchema = z.object({
   entries: z.array(directoryEntrySchema),
   truncated: z.boolean(),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.listDirectory'>>>
+
+/** One tree row shared by the level's file and directory entries. */
+export const treeEntrySchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  kind: z.enum(['file', 'directory']),
+  hidden: z.boolean(),
+}) satisfies z.ZodType<Wire<TreeEntry>>
+
+/** host.listTreeEntries request payload; the tree's root is caller-owned, so the path is required. */
+export const hostListTreeEntriesRequestSchema = z.object({
+  path: z.string().min(1),
+}) satisfies z.ZodType<Wire<RequestPayload<'host.listTreeEntries'>>>
+
+/** host.listTreeEntries response value. */
+export const hostListTreeEntriesValueSchema = z.object({
+  path: z.string(),
+  entries: z.array(treeEntrySchema),
+  truncated: z.boolean(),
+}) satisfies z.ZodType<Wire<ResponseValue<'host.listTreeEntries'>>>
 
 /** host.createDirectory request payload: name must be one plain path segment. */
 export const hostCreateDirectoryRequestSchema = z.object({

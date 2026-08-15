@@ -127,12 +127,20 @@ export class FakeApiClient implements IApiClient {
   }>> =
     () => Promise.resolve(ok({ path: '/home/fake', home: '/home/fake', crumbs: [{ name: '/', path: '/', hidden: false }], entries: [], truncated: false }))
 
+  onListTreeEntries: (payload: unknown) => Promise<RpcResponse<{
+    path: string
+    entries: { name: string; path: string; kind: 'file' | 'directory'; hidden: boolean }[]
+    truncated: boolean
+  }>> =
+    () => Promise.resolve(ok({ path: '/home/fake', entries: [], truncated: false }))
+
   onCreateDirectory: (payload: unknown) => Promise<RpcResponse<{ path: string }>> =
     () => Promise.resolve(ok({ path: '/home/fake/new' }))
 
   private readonly muxConns: StreamConn<MuxFrame>[] = []
   private readonly hostConns: StreamConn<HostFrame>[] = []
   lastSearchSignal: AbortSignal | undefined
+  lastTreeSignal: AbortSignal | undefined
 
   // Parameters carry local structural annotations: the CI lint lane runs
   // without built lib/, so IApiClient's indexed-access types collapse to any
@@ -178,6 +186,10 @@ export class FakeApiClient implements IApiClient {
     describe: (payload: unknown) => this.record('host.describe', payload, this.onDescribe(payload)),
     pickDirectory: (payload: unknown) => this.record('host.pickDirectory', payload, this.onPickDirectory(payload)),
     listDirectory: (payload: unknown) => this.record('host.listDirectory', payload, this.onListDirectory(payload)),
+    listTreeEntries: (payload: unknown, signal?: AbortSignal) => {
+      this.lastTreeSignal = signal
+      return this.record('host.listTreeEntries', payload, this.onListTreeEntries(payload))
+    },
     createDirectory: (payload: unknown) => this.record('host.createDirectory', payload, this.onCreateDirectory(payload)),
     openPath: (payload: unknown) => this.record('host.openPath', payload, this.onOpenPath(payload)),
   }

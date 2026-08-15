@@ -1,6 +1,8 @@
 /** Behavior of the browse backend over a real temporary directory tree. */
 
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:net'
+import type { Server } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -13,6 +15,7 @@ import type { ListingCandidate } from '../src/index.ts'
 let root: string
 let capability: DirectoryPickerBrowseCapability
 let dispose: () => Promise<void>
+let socketServer: Server | undefined
 
 beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'dsh-browse-'))
@@ -29,6 +32,21 @@ beforeAll(async () => {
     // feeds the POSIX lanes' coverage of the symlink-to-file arm, and every
     // assertion below expects it to be filtered out anyway.
   }
+  try {
+    // A symlink whose target is neither file nor directory (a UNIX socket)
+    // pins the tree row's "no row" arm; Windows cannot create such a link,
+    // so the Linux coverage lane owns this fixture.
+    const socketPath = join(root, 'socket')
+    socketServer = createServer()
+    await new Promise<void>((resolve, reject) => {
+      socketServer!.once('error', reject)
+      socketServer!.listen(socketPath, () => { resolve() })
+    })
+    await symlink(socketPath, join(root, 'socket-link'))
+  } catch {
+    // Windows or a platform without file symlinks: the fixture is absent and
+    // the arm stays Linux-lane coverage.
+  }
 
   const ctx = new Context()
   const fiber = ctx.plugin(BrowseDirectoryPicker)
@@ -42,6 +60,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await dispose()
   await rm(root, { recursive: true, force: true })
+  await new Promise<void>((resolve) => { socketServer?.close(() => { resolve() }) })
 })
 
 describe('BrowseDirectoryPicker', () => {
@@ -137,7 +156,7 @@ describe('BrowseDirectoryPicker', () => {
   })
 
   it('boundedInsert keeps the window name-sorted and bounded, reporting evictions', () => {
-    const candidate = (name: string): ListingCandidate => ({ name, isDirectory: true, isSymbolicLink: false })
+    const candidate = (name: string): ListingCandidate => ({ name, isDirectory: true, isFile: false, isSymbolicLink: false })
     const window: ListingCandidate[] = []
     expect(boundedInsert(window, candidate('m'), 2)).toBe(false)
     expect(boundedInsert(window, candidate('z'), 2)).toBe(false)
@@ -164,6 +183,71 @@ describe('BrowseDirectoryPicker', () => {
   it('lists the home directory when no path is given', async () => {
     const listing = await capability.list()
     expect(listing.path).toBe(homedir())
+  })
+
+  it('lists files and directories together for a tree, sorted by name with kinds and hidden flags', async () => {
+    const listing = await capability.listTreeEntries(root)
+    expect(listing.path).toBe(root)
+    expect(listing.entries.map(entry => entry.name)).toEqual(['.hidden-dir', 'linked', 'notes.txt', 'projects'])
+    expect(listing.entries.map(entry => entry.kind)).toEqual(['directory', 'directory', 'file', 'directory'])
+    expect(listing.entries.map(entry => entry.hidden)).toEqual([true, false, false, false])
+    // Every entry path is absolute and host-joined — clients never join segments.
+    expect(listing.entries.every(entry => entry.path === join(root, entry.name))).toBe(true)
+    expect(listing.truncated).toBe(false)
+  })
+
+  it('resolves symlink kinds through the target and skips broken links', async () => {
+    const listing = await capability.listTreeEntries(root)
+    // `linked` points at a directory; `broken` names a missing target.
+    expect(listing.entries.find(entry => entry.name === 'linked')).toMatchObject({ kind: 'directory' })
+    expect(listing.entries.find(entry => entry.name === 'broken')).toBeUndefined()
+    // POSIX-only: `file-link` points at a file (the fixture creation skips
+    // the link on Windows, where the row then simply does not exist).
+    const fileLink = listing.entries.find(entry => entry.name === 'file-link')
+    if (fileLink !== undefined) expect(fileLink.kind).toBe('file')
+    // A symlink whose target is neither file nor directory (a UNIX socket)
+    // has no tree row either; POSIX-only fixture, see beforeAll.
+    expect(listing.entries.find(entry => entry.name === 'socket-link')).toBeUndefined()
+  })
+
+  it('cuts a tree level at maxEntries keeping the name-sorted head, and flags the cut', async () => {
+    const ctx = new Context()
+    const fiber = ctx.plugin(BrowseDirectoryPicker, { maxEntries: 2 })
+    await fiber.await()
+    const bounded = ctx.get('directoryPicker')!.capability()
+    if (bounded.kind !== 'browse') throw new Error('browse backend must advertise the browse capability')
+    try {
+      const cut = await bounded.listTreeEntries(root)
+      expect(cut.entries.map(entry => entry.name)).toEqual(['.hidden-dir', 'linked'])
+      expect(cut.truncated).toBe(true)
+    } finally {
+      await fiber.dispose()
+    }
+  })
+
+  it('stops a tree scan with the caller: an aborted signal rejects with its own reason', async () => {
+    const gone = new AbortController()
+    gone.abort(new Error('caller left'))
+    await expect(capability.listTreeEntries(root, gone.signal)).rejects.toThrow('caller left')
+    // A live signal leaves a normal tree listing untouched.
+    const live = new AbortController()
+    const complete = await capability.listTreeEntries(root, live.signal)
+    expect(complete.truncated).toBe(false)
+    expect(complete.entries.map(entry => entry.name)).toContain('projects')
+    // Ordinary failures stay directory-unreadable, like list.
+    const missing = join(root, 'no-such-dir')
+    const failure = await capability.listTreeEntries(missing, live.signal).catch((error: unknown) => error)
+    expect(failure).toBeInstanceOf(DirectoryPickerError)
+    expect((failure as DirectoryPickerError).code).toBe('directory-unreadable')
+  })
+
+  it('rejects non-fully-qualified tree roots instead of rebasing them under the process cwd', async () => {
+    for (const relative of ['', 'projects', './projects', '..']) {
+      const failure = await capability.listTreeEntries(relative).catch((error: unknown) => error)
+      expect(failure).toBeInstanceOf(DirectoryPickerError)
+      expect((failure as DirectoryPickerError).code).toBe('directory-unreadable')
+      expect((failure as DirectoryPickerError).path).toBe(relative)
+    }
   })
 
   it('throws directory-unreadable for a missing target', async () => {

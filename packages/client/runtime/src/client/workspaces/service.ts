@@ -3,7 +3,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {
   DirectoryListing, IApiClient, RpcError,
-  SessionId, WorkspaceId, WorkspaceView,
+  SessionId, TreeListing, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SnapshotStore } from '../contract/store.ts'
 import { createSnapshotStore } from '../contract/store.ts'
@@ -222,6 +222,20 @@ export class WorkspaceRuntime implements IWorkspaces {
    */
   async listDirectory(path?: string, signal?: AbortSignal): Promise<DirectoryListing> {
     const response = await this.api.host.listDirectory(path === undefined ? {} : { path }, signal)
+    if (!response.result.ok) throw new DirectoryBrowseError(response.result.error)
+    return response.result.value
+  }
+
+  /**
+   * List one directory level for a tree through the Host's `browse`
+   * capability: files and directories together, no ancestry (the tree's
+   * root is caller-owned, so the path is required).
+   * @param path - absolute directory to list.
+   * @param signal - aborts the wire request (and the Host's scan) when the caller supersedes it.
+   * @returns the level's children with their kinds.
+   */
+  async listTreeEntries(path: string, signal?: AbortSignal): Promise<TreeListing> {
+    const response = await this.api.host.listTreeEntries({ path }, signal)
     if (!response.result.ok) throw new DirectoryBrowseError(response.result.error)
     return response.result.value
   }

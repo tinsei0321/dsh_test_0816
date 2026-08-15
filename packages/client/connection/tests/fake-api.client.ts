@@ -93,6 +93,13 @@ export class FakeApiClient implements IApiClient {
   }>> =
     () => Promise.resolve(ok({ path: '/home/fake', home: '/home/fake', crumbs: [{ name: '/', path: '/', hidden: false }], entries: [], truncated: false }))
 
+  onListTreeEntries: (payload: unknown) => Promise<RpcResponse<{
+    path: string
+    entries: { name: string; path: string; kind: 'file' | 'directory'; hidden: boolean }[]
+    truncated: boolean
+  }>> =
+    () => Promise.resolve(ok({ path: '/home/fake', entries: [], truncated: false }))
+
   onCreateDirectory: (payload: unknown) => Promise<RpcResponse<{ path: string }>> =
     () => Promise.resolve(ok({ path: '/home/fake/new' }))
 
@@ -144,6 +151,7 @@ export class FakeApiClient implements IApiClient {
     describe: payload => this.record('host.describe', payload, this.onDescribe(payload)),
     pickDirectory: payload => this.record('host.pickDirectory', payload, this.onPickDirectory(payload)),
     listDirectory: payload => this.record('host.listDirectory', payload, this.onListDirectory(payload)),
+    listTreeEntries: payload => this.record('host.listTreeEntries', payload, this.onListTreeEntries(payload)),
     createDirectory: payload => this.record('host.createDirectory', payload, this.onCreateDirectory(payload)),
     openPath: payload => this.record('host.openPath', payload, this.onOpenPath(payload)),
   }

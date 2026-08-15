@@ -18,6 +18,7 @@ import {
   hostCreateDirectoryRequestSchema, hostCreateDirectoryValueSchema,
   hostDescribeRequestSchema, hostDescribeValueSchema,
   hostListDirectoryRequestSchema, hostListDirectoryValueSchema,
+  hostListTreeEntriesRequestSchema, hostListTreeEntriesValueSchema,
 } from '../src/api/host.schema.ts'
 import {
   workspaceArchiveSessionRequestSchema, workspaceArchiveSessionValueSchema,
@@ -341,6 +342,28 @@ describe('host domain schemas', () => {
       expect(() => hostCreateDirectoryRequestSchema.parse({ path: '/x', name })).toThrow()
     }
     expect(hostCreateDirectoryValueSchema.parse({ path: '/x/new' })).toEqual({ path: '/x/new' })
+  })
+
+  it('validates the tree-listing payload and value', () => {
+    expect(hostListTreeEntriesRequestSchema.parse({ path: '/home/u/p' })).toEqual({ path: '/home/u/p' })
+    // The tree's root is caller-owned: the path is required, never defaulted.
+    expect(() => hostListTreeEntriesRequestSchema.parse({})).toThrow()
+    expect(() => hostListTreeEntriesRequestSchema.parse({ path: '' })).toThrow()
+    const listing = hostListTreeEntriesValueSchema.parse({
+      path: '/home/u/p',
+      entries: [
+        { name: 'src', path: '/home/u/p/src', kind: 'directory', hidden: false },
+        { name: '.env', path: '/home/u/p/.env', kind: 'file', hidden: true },
+      ],
+      truncated: false,
+    })
+    expect(listing.entries[0]?.kind).toBe('directory')
+    expect(listing.entries[1]?.hidden).toBe(true)
+    // Kinds are a closed wire enumeration; the flag is part of the value.
+    expect(() => hostListTreeEntriesValueSchema.parse({
+      path: '/x', entries: [{ name: 'a', path: '/x/a', kind: 'socket', hidden: false }], truncated: false,
+    })).toThrow()
+    expect(() => hostListTreeEntriesValueSchema.parse({ path: '/x', entries: [] })).toThrow()
   })
 })
 

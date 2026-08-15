@@ -1,7 +1,7 @@
 /** Test-owned workspaces face: the renderer standard-kit observable plus recorded actions. */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  DirectoryListing, IWorkspaces, SessionId, SnapshotStore, WorkspaceId, WorkspaceListState, WorkspaceView,
+  DirectoryListing, IWorkspaces, SessionId, SnapshotStore, TreeListing, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { workspaceListState } from './fixtures.ts'
 import type { Stabilizer } from './fixtures.ts'
@@ -135,6 +135,20 @@ export class TestWorkspaces implements IWorkspaces {
       entries: [],
       truncated: false,
     }
+  }
+
+  /**
+   * Browse tree listing (recorded). The default serves an empty level; stub
+   * to shape a tree.
+   * @param path - absolute directory to list.
+   * @param signal - caller lifetime; recorded and forwarded like the production face.
+   * @returns the level's children with their kinds.
+   */
+  async listTreeEntries(path: string, signal?: AbortSignal): Promise<TreeListing> {
+    this.calls.push({ method: 'listTreeEntries', args: [path, signal] })
+    const stub = this.stubs.get('listTreeEntries')
+    if (stub !== undefined) return await (stub(path, signal) as Promise<TreeListing>)
+    return { path, entries: [], truncated: false }
   }
 
   /**
