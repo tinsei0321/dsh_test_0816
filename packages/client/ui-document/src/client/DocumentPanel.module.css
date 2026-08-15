@@ -1,0 +1,214 @@
+/* The details column's document half, Codex file-viewer style: an open-file
+   tab strip on top, then the reader owning the remaining space. The project
+   directory tree is the frame's rightmost column (ui-project), beside this
+   panel. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.empty {
+  padding: 8px 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* ── open-file tab strip ────────────────────────────────────────────────── */
+
+.tabRow {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.tabStrip {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.closeAll {
+  flex: none;
+  padding: 3px 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.closeAll:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.fileTab,
+.fileTabActive {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  max-width: 160px;
+  border-radius: 6px;
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.fileTabActive {
+  background: var(--dsw-alias-interactive-bg-selected, var(--dsw-alias-interactive-bg-hover));
+  box-shadow: inset 0 -2px 0 var(--dsw-alias-brand-primary);
+}
+
+.fileTabButton {
+  overflow: hidden;
+  max-width: 130px;
+  padding: 4px 6px 4px 8px;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fileTabActive .fileTabButton {
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
+
+.fileTabClose {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 2px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.fileTabClose:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* ── reader zone ────────────────────────────────────────────────────────── */
+
+.viewer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.docHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.docPath {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ── reader mode switch ─────────────────────────────────────────────────── */
+
+.modeSwitch {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.modeButton,
+.modeButtonActive {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.modeButton:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.modeButtonActive {
+  background: var(--dsw-alias-interactive-bg-selected, var(--dsw-alias-interactive-bg-hover));
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
+
+.readingMarkdown {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.readingPlain {
+  margin: 0;
+  font-family: var(--dsw-font-mono, ui-monospace, 'Cascadia Mono', Consolas, monospace);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: var(--dsw-alias-label-primary);
+}
+
+.renderFrame {
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+}
+
+.changes {
+  margin-top: 16px;
+}
+
+.changesLabel {
+  margin-bottom: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-secondary);
+}

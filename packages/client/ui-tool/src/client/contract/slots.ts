@@ -36,6 +36,8 @@ export interface ToolCallOwnerProps {
   cwd?: string | undefined
   /** Open a Tool argument path through the Host. */
   openFile: (path: string) => void
+  /** Open the path in the details panel's document tab (Codex-style follow). */
+  openDocument: (path: string) => void
   /** Inspect this call in the trajectory view when available. */
   inspect?: (() => void) | undefined
 }

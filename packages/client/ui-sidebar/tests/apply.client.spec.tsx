@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /** Sidebar shell slot registration and its plain runtime/layout callbacks. */
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
@@ -11,7 +12,7 @@ async function bench(declare = true) {
   await ctx.plugin(SlotRegistry).await()
   const layout = { toggleSidebar: vi.fn() }
   const workspaces = { startSession: vi.fn() }
-  const sessions = { open: vi.fn(), clear: vi.fn() }
+  const sessions = { open: vi.fn(), clear: vi.fn(), list: { getSnapshot: () => ({ ids: [], current: undefined }) } }
   ctx.provide('layout', layout)
   ctx.provide('sessions', sessions as never)
   ctx.provide('workspaces', workspaces as never)
@@ -54,6 +55,22 @@ describe('ui-sidebar apply', () => {
   it('fails when no live owner declared the sidebar slot', async () => {
     const b = await bench(false)
     await expect(b.ctx.plugin({ inject: [...inject], apply })).rejects.toThrow(/not declared/)
+  })
+
+  it('switches sessions on Cmd/Ctrl+Shift+[ / ] through the listed order', async () => {
+    const b = await bench()
+    const ids = ['a', 'b', 'c'] as never[]
+    let current = 'b' as never
+    b.sessions.list.getSnapshot = () => ({ ids, current })
+    b.sessions.open.mockImplementation((id: never) => { current = id })
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: ']', metaKey: true, shiftKey: true }))
+    expect(b.sessions.open).toHaveBeenCalledWith('c')
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: '[', ctrlKey: true, shiftKey: true }))
+    expect(b.sessions.open).toHaveBeenLastCalledWith('b')
+    // Wraps around the ends of the list.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: '[', metaKey: true, shiftKey: true }))
+    expect(b.sessions.open).toHaveBeenLastCalledWith('a')
   })
 
   it('removes the entry and child declaration on teardown', async () => {

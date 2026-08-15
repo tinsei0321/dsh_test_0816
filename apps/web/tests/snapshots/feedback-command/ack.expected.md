@@ -9,7 +9,7 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- text: Reply with the single word LIGHTHOUSE and stop. {{clock}}
+- text: Step 1 Completed Reply with the single word LIGHTHOUSE and stop. {{clock}}
 - button "Copy":
   - img
 - button "Context injection @deepseek-ai/dsh-system-prompt":

@@ -11,7 +11,7 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- text: Explain event sourcing in one sentence. {{clock}}
+- text: Step 1 Running Explain event sourcing in one sentence. {{clock}}
 - button "Copy":
   - img
 - button "Context injection @deepseek-ai/dsh-system-prompt":

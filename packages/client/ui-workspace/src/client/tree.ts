@@ -297,14 +297,18 @@ export function deriveFlat(
   return rows.map(session => sessionNode(session, descendants))
 }
 
-/** Relative-time bucket of a session row's trailing label. */
-export type RelativeTimeUnit = 'now' | 'minutes' | 'hours' | 'days' | 'months' | 'years'
-
-/** Structured relative time: the bucket plus its magnitude (0 for 'now'). */
-export interface RelativeTime {
-  unit: RelativeTimeUnit
-  n: number
-}
+/**
+ * Calendar-aware compact bucket of a session row's trailing time label: fresh
+ * distances stay relative, then the label switches to a day marker and finally
+ * to a plain date, matching the chat message-clock ladder.
+ */
+export type SessionTimeBucket =
+  | { unit: 'now' }
+  | { unit: 'minutes'; n: number }
+  | { unit: 'hours'; n: number }
+  | { unit: 'yesterday'; hour: number; minute: number }
+  | { unit: 'date'; month: number; day: number }
+  | { unit: 'dateFull'; year: number; month: number; day: number }
 
 /**
  * Merge immediate title/Workspace substring matches with ranked Host content
@@ -393,21 +397,36 @@ export function deriveSearchResults(
 }
 
 /**
- * Compact relative time for session rows, as a structured bucket the
- * renderer localizes ("now"/"5min"/"3h"/"2d"/"4mo"/"1y" in en).
+ * Bucket a session's last-activity time for the row's compact label: under a
+ * minute is "now", under an hour is minutes (even across midnight), then the
+ * ladder turns calendar-based — the same day reports hours, the previous
+ * calendar day reports its clock time, an older date in the current year
+ * reports month-day, and anything earlier reports the full year-month-day.
+ * Clock-skewed future timestamps collapse into the now bucket.
  * @param updatedAt - epoch ms of the session's last activity.
  * @param now - current epoch ms (injected for pure rendering).
- * @returns the row's trailing time bucket and magnitude.
+ * @returns the row's trailing time bucket.
  */
-export function relativeTime(updatedAt: number, now: number): RelativeTime {
+export function sessionTimeBucket(updatedAt: number, now: number): SessionTimeBucket {
   const MIN = 60_000
   const HOUR = 3_600_000
-  const DAY = 86_400_000
   const diff = Math.max(0, now - updatedAt)
-  if (diff < MIN) return { unit: 'now', n: 0 }
+  if (diff < MIN) return { unit: 'now' }
   if (diff < HOUR) return { unit: 'minutes', n: Math.floor(diff / MIN) }
-  if (diff < DAY) return { unit: 'hours', n: Math.floor(diff / HOUR) }
-  if (diff < 30 * DAY) return { unit: 'days', n: Math.floor(diff / DAY) }
-  if (diff < 365 * DAY) return { unit: 'months', n: Math.floor(diff / (30 * DAY)) }
-  return { unit: 'years', n: Math.floor(diff / (365 * DAY)) }
+  const updated = new Date(updatedAt)
+  const current = new Date(now)
+  const dayStart = (value: Date): number =>
+    new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime()
+  const updatedDayStart = dayStart(updated)
+  const currentDayStart = dayStart(current)
+  if (updatedDayStart === currentDayStart) return { unit: 'hours', n: Math.floor(diff / HOUR) }
+  // Calendar subtraction, not `- 86_400_000`: DST-shift days are 23h/25h long.
+  const yesterdayStart = new Date(current.getFullYear(), current.getMonth(), current.getDate() - 1).getTime()
+  if (updatedDayStart === yesterdayStart) {
+    return { unit: 'yesterday', hour: updated.getHours(), minute: updated.getMinutes() }
+  }
+  const month = updated.getMonth() + 1
+  const day = updated.getDate()
+  if (updated.getFullYear() === current.getFullYear()) return { unit: 'date', month, day }
+  return { unit: 'dateFull', year: updated.getFullYear(), month, day }
 }

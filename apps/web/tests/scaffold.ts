@@ -794,10 +794,11 @@ function normalizeAria(snapshot: string, workspaceCwd: string): string {
     .split(workspaceCwd).join('{{cwd}}')
     .split(base).join('{{workspace}}')
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{{uuid}}')
-    // The optional space in `\d+m ?\d+s` covers both minute spellings: the
-    // stats line's compact `2m42s` and the message-chrome template's `2m 42s`.
+    // The optional spaces cover every duration spelling: the stats line's
+    // compact `2m42s`, the message-chrome template's `2m 42s`, and the tool
+    // duration chip's `1.2 s` / `42 ms` (tool-call-model.ts owns the spellings).
     .replace(
-      /~\d+(?:y(?: \d+mo)?|mo(?: \d+d)?)|\b(?:\d+d(?: \d+h(?: \d+m \d+s)?)?|\d+h \d+m \d+s|\d+m ?\d+s|\d+(?:\.\d+)?s|\d+(?:\.\d+)?ms)\b/g,
+      /~\d+(?:y(?: \d+mo)?|mo(?: \d+d)?)|\b(?:\d+d(?: \d+h(?: \d+m \d+s)?)?|\d+h \d+m \d+s|\d+m ?\d+s|\d+(?:\.\d+)? ?m?s)\b/g,
       duration => duration.startsWith('~') ? duration : '{{duration}}',
     )
     .replace(

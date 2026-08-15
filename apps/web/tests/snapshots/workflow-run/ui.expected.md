@@ -1,4 +1,4 @@
-- text: "Use the workflow tool exactly once, with args omitted, meta set to { \"name\": \"snapshot-flow\", \"description\": \"one child for the snapshot\" }, and this EXACT script body (copy it verbatim): phase('Run') const reply = await agent('Reply with exactly the word WF_CHILD_OK and nothing else.') return { reply } After the workflow returns, reply with the single word WORKFLOW_DONE and stop. Do not use any other tool. {{clock}}"
+- text: "Step 1 Completed Use the workflow tool exactly once, with args omitted, meta set to { \"name\": \"snapshot-flow\", \"description\": \"one child for the snapshot\" }, and this EXACT script body (copy it verbatim): phase('Run') const reply = await agent('Reply with exactly the word WF_CHILD_OK and nothing else.') return { reply } After the workflow returns, reply with the single word WORKFLOW_DONE and stop. Do not use any other tool. {{clock}}"
 - button "Copy":
   - img
 - button "Context injection @deepseek-ai/dsh-system-prompt":
@@ -9,17 +9,17 @@
   - img
   - img
   - text: "Think The user wants me to use the workflow tool exactly once with specific parameters. Let me carefully follow the instructions:"
-- button "Tool call workflow ·":
+- button "Tool call workflow · {{duration}}":
   - img
   - img
-  - text: Tool call workflow ·
+  - text: Tool call workflow · {{duration}}
 - button "snapshot-flow 1 member Completed" [expanded]:
   - img
   - text: snapshot-flow 1 member Completed
 - button "Run 1 member Completed 1" [expanded]:
   - img
   - text: Run 1 member Completed 1
-- text: Reply with exactly the word WF_CHILD_OK and not… Completed
+- text: Reply with exactly the word WF_CHILD_OK and not… Completed Step 2 Completed
 - button "Think The workflow returned successfully with the reply \"WF_CHILD_OK\". Now I need to reply with exactly \"WORKFLOW_DONE\" and stop.":
   - img
   - img

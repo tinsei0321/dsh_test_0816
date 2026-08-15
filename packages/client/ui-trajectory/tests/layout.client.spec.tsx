@@ -26,6 +26,19 @@ describe('TrajectoryTurnHeader', () => {
     expect(screen.getByText('Think')).toBeTruthy()
     expect(screen.getByText('Time')).toBeTruthy()
   })
+
+  it('renders the turn wall-clock span when provided', () => {
+    render(<TrajectoryTurnHeader turn={2} durationMs={65_000} />)
+    expect(screen.getByText('· 1m 05s')).toBeTruthy()
+  })
+
+  it('omits the duration chip when the span is absent', () => {
+    const { container } = render(<TrajectoryTurnHeader turn={2} />)
+    expect(screen.getByText('Turn 2')).toBeTruthy()
+    expect(container.textContent).not.toContain('·')
+    const nonFinite = render(<TrajectoryTurnHeader turn={3} durationMs={Number.NaN} />)
+    expect(nonFinite.container.textContent).not.toContain('·')
+  })
 })
 
 describe('TrajectoryGroupHeader', () => {
@@ -52,6 +65,15 @@ describe('TrajectoryTurn', () => {
     expect(screen.getByText('Turn 3')).toBeTruthy()
     expect(screen.getByText('Message')).toBeTruthy()
     expect(screen.getByText('49s')).toBeTruthy()
+  })
+
+  it('passes the turn span to the sticky header', () => {
+    render(
+      <TrajectoryTurn turn={4} durationMs={1_234}>
+        <TrajectoryGroupHeader title="Step 1" />
+      </TrajectoryTurn>,
+    )
+    expect(screen.getByText('· 1.2 s')).toBeTruthy()
   })
 })
 
@@ -89,6 +111,40 @@ describe('deriveTrajectoryLayout', () => {
       previewMarkdown: '{"command":"ls"}',
     })
     expect(tool?.timeSeconds).toBe(1.3)
+    // Turn wall clock: first user event (1s) to the tool result (7.5s).
+    expect(turns[0]?.durationMs).toBe(6_500)
+  })
+
+  it('derives the turn span from a lone timed cell and omits it when times are absent', () => {
+    const userOnly = deriveTrajectoryLayout({
+      nodes: [
+        { kind: 'user', seq: 1, time: 1_000, content: [{ type: 'text', text: 'hi' }], source: null },
+      ] as unknown as ConversationSnapshot['nodes'],
+      partial: null,
+      runningCalls: [],
+    })
+    expect(userOnly[0]?.durationMs).toBe(0)
+    const untimed = deriveTrajectoryLayout({
+      nodes: [
+        { kind: 'user', seq: 1, time: null, content: [{ type: 'text', text: 'hi' }], source: null },
+      ] as unknown as ConversationSnapshot['nodes'],
+      partial: null,
+      runningCalls: [],
+    })
+    // The optional field is absent, not null, when no cell carries a time.
+    expect(untimed[0]?.durationMs).toBeUndefined()
+    // A lone timed cell without its own duration (untimed message) spans nothing.
+    const loneUntimed = deriveTrajectoryLayout({
+      nodes: [
+        {
+          kind: 'assistant', seq: 2, time: 5_000, turn: 1, step: 1,
+          blocks: [{ kind: 'text', text: 'ok' }], usage: undefined,
+        },
+      ] as unknown as ConversationSnapshot['nodes'],
+      partial: null,
+      runningCalls: [],
+    })
+    expect(loneUntimed[0]?.durationMs).toBeUndefined()
   })
 
   it('adds runningCalls not already present and leaves their time blank', () => {

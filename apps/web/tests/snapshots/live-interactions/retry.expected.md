@@ -9,7 +9,7 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- text: Reply with a one-sentence description of event sourcing, then stop. {{clock}}
+- text: Step 1 Completed Reply with a one-sentence description of event sourcing, then stop. {{clock}}
 - button "Copy":
   - img
 - button "Context injection @deepseek-ai/dsh-system-prompt":

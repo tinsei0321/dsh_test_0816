@@ -14,6 +14,7 @@
   - img
   - img
   - text: "goal Goal created Status: active Objective: Keep the composer context panels aligned Rounds: 0/256 Activation: armed Commands: /goal edit <objective>, /goal pause, /goal clear"
+- text: Step 1 Running
 - button "Context injection goal":
   - img
   - img

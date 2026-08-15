@@ -172,6 +172,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     block: ToolCallBlock
     selectedCallId: string | undefined
     openFile: ChatNodeOwnerProps['openFile']
+    openDocument: ChatNodeOwnerProps['openDocument']
     inspectCall: ChatNodeOwnerProps['inspectCall']
   }> = []
   const renderCommandSlot = ((_key: string, _owner: object, opts?: { fallback?: React.ReactNode }) =>
@@ -242,6 +243,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
           block,
           selectedCallId: nodeOwner.selectedCallId,
           openFile: nodeOwner.openFile,
+          openDocument: nodeOwner.openDocument,
           inspectCall: nodeOwner.inspectCall,
         }
         toolOwners.push(tool)
@@ -282,6 +284,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
     SessionProvider: SessionProviderStub,
     openDetails,
     openFile,
+    openDocument: vi.fn<(path: string) => void>(),
     loadOlder,
     loadImage: vi.fn(() => Promise.reject(new Error('not used'))),
     inspectCall,

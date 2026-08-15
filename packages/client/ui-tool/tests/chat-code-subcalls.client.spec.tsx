@@ -262,21 +262,22 @@ describe('run_code sub-calls through the real chat machinery', () => {
     expect(nested).not.toBeNull()
   })
 
-  it('a file sub-row click opens the host path; bash sub-rows do not open details', async () => {
+  it('a file sub-row click opens the document panel; bash sub-rows do not open details', async () => {
     const parent = 'call-64'
     const subCalls = [
       subCall(11, parent, 1, 'read', { path: 'notes/demo.txt' }, 'ok'),
       subCall(12, parent, 2, 'bash', { command: 'ls notes', description: 'List notes' }, 'demo.txt'),
     ]
     const b = await bench(snapshotWith([codeResult(10, parent)], subCalls))
+    const documentOpen = b.ctx.get('documentOpen') as { open: (path: string) => void }
+    const open = vi.spyOn(documentOpen, 'open')
     const view = mountApp(b.slots)
     view.getByText('notes/demo.txt').click()
-    expect(b.layout.openDetails).not.toHaveBeenCalled()
-    await vi.waitFor(() => {
-      expect(b.workspaces.openPath).toHaveBeenCalledWith('notes/demo.txt')
-    })
+    expect(open).toHaveBeenCalledWith('notes/demo.txt')
+    expect(b.workspaces.openPath).not.toHaveBeenCalled()
     view.getByText('List notes').click()
     expect(b.layout.openDetails).not.toHaveBeenCalled()
+    expect(open).toHaveBeenCalledTimes(1)
   })
 
   it('a RUNNING run_code call nests its so-far dispatches under the spinner row', async () => {

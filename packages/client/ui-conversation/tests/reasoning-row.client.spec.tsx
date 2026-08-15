@@ -82,7 +82,7 @@ describe('ReasoningRow', () => {
     expect(summary.hasAttribute('data-follow-end')).toBe(false)
   })
 
-  it('expands from either Think or the reasoning summary', () => {
+  it('expands from either the localized Think title or the reasoning summary', () => {
     const view = render(
       <AssistantMarkdown
         t={t}
@@ -96,7 +96,7 @@ describe('ReasoningRow', () => {
     expect(row.getAttribute('aria-expanded')).toBe('true')
     expect(view.getByText(/Check persistence/)).toBeTruthy()
 
-    fireEvent.click(view.getByText('Think'))
+    fireEvent.click(view.getByText('思考'))
     expect(row.getAttribute('aria-expanded')).toBe('false')
   })
 
@@ -108,7 +108,7 @@ describe('ReasoningRow', () => {
         streaming={false}
       />,
     )
-    fireEvent.click(view.getByText('Think'))
+    fireEvent.click(view.getByText('思考'))
     expect(view.getAllByText(/Inspect the session/)).toHaveLength(1)
     expect(view.queryByText('IN')).toBeNull()
     expect(view.container.querySelector('[class*="ioCard"]')).toBeNull()

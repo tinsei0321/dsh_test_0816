@@ -18,6 +18,8 @@ import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { PendingSteeringBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
+import { StepGroupHeader } from './StepGroupHeader.tsx'
+import { deriveStepRows } from './step-groups.ts'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
@@ -145,7 +147,7 @@ function TurnStatus({ startTime, t }: {
  */
 export function ChatView({
   useSession, useSessions, useStore, renderSlot, sessionId, openFile, loadOlder, loadImage, inspectCall, chatScroll, forkAt,
-  fileMentions, t,
+  openDocument, fileMentions, t,
 }: ChatViewSlotProps) {
   const order = useSession(s => s.chat.order)
   const nodeStore = useSession(s => s.chat.nodes)
@@ -165,6 +167,14 @@ export function ChatView({
     [inbox],
   )
   const runningTurnStart = useMemo(() => runningTurnStartTime(timeline), [timeline])
+
+  // Step grouping: pure derivation over the flow order and the node store.
+  // Recomputes as nodes stream/settle so a step header's status recolors in
+  // place (running -> completed/error) without remounting the header row.
+  const stepRows = useMemo(
+    () => deriveStepRows(order, nodeStore),
+    [order, nodeStore],
+  )
 
   const listRef = useRef<HTMLDivElement | null>(null)
   const columnRef = useRef<HTMLDivElement | null>(null)
@@ -379,22 +389,32 @@ export function ChatView({
               </button>
             </div>
           )}
-          {order.map(nodeKey => (
-            <ChatNodeSeat
-              key={nodeKey}
-              nodeKey={nodeKey}
-              useSession={useSession}
-              selectedCallId={selectedCallId}
-              cwd={cwd}
-              openFile={openFile}
-              inspectCall={inspectCall}
-              forkAt={forkAt}
-              loadImage={loadImage}
-              fileMentions={fileMentions}
-              renderSlot={renderSlot}
-              t={t}
-            />
-          ))}
+          {stepRows.map(row => row.kind === 'step'
+            ? (
+              <StepGroupHeader
+                key={`step:${row.turn}:${row.step}`}
+                step={row.step}
+                status={row.status}
+                t={t}
+              />
+            )
+            : (
+              <ChatNodeSeat
+                key={row.key}
+                nodeKey={row.key}
+                useSession={useSession}
+                selectedCallId={selectedCallId}
+                cwd={cwd}
+                openFile={openFile}
+                openDocument={openDocument}
+                inspectCall={inspectCall}
+                forkAt={forkAt}
+                loadImage={loadImage}
+                fileMentions={fileMentions}
+                renderSlot={renderSlot}
+                t={t}
+              />
+            ))}
           {/* No pending placeholders: questions (ui-user-questions) and approvals
               (ApprovalPanel) both take over the composer, so a flow card would
               double-render the same wait. */}

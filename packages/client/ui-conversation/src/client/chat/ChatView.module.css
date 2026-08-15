@@ -57,6 +57,32 @@
   display: none;
 }
 
+/* Codex-style step grouping header: a muted one-line boundary above the first
+   node of each Agent step. The dot rides the shared StateDot tri-state. */
+.stepHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  margin-bottom: -6px; /* pull the following 16px column gap tight to the step */
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.stepLabel {
+  font-weight: 500;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.stepStatus {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.stepHeader[data-step-status='error'] .stepStatus {
+  color: var(--dsw-alias-state-error-primary);
+}
+
 .callRow {
   border-radius: 6px;
 }

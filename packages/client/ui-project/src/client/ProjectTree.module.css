@@ -1,0 +1,191 @@
+/* Project directory tree (the frame's rightmost column): header row, then
+   the tree with one scroll container of its own. Tokens only; the indent
+   steps live in the row's --depth custom property (set inline by the
+   component). */
+
+.root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-bottom: 8px;
+  scrollbar-gutter: stable;
+}
+
+/* Collapsed rail: a narrow column with the single re-open affordance. */
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding-top: 8px;
+  box-sizing: border-box;
+}
+
+.railToggle {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.railToggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  height: 28px;
+  margin-bottom: 2px;
+  box-sizing: border-box;
+}
+
+.label {
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.showHidden {
+  flex: none;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.showHidden:hover {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.showHidden[aria-pressed='true'] {
+  color: var(--dsw-alias-label-primary);
+}
+
+.collapse {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.collapse:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.empty {
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.tree {
+  flex: none;
+}
+
+.tree [role='group'] {
+  margin: 0;
+}
+
+.row,
+.rootRow {
+  --depth: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  padding: 0 8px 0 calc(6px + var(--depth) * 14px);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.row:hover,
+.rootRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.rootRow {
+  padding-left: 6px;
+  font-weight: 500;
+}
+
+.chevron {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.folder {
+  flex: none;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Selection follows the workspace browser's current-row convention: weight,
+   not a background tint. */
+.selectedItem .row .name {
+  font-weight: 500;
+}
+
+.status,
+.truncated {
+  --depth: 0;
+  padding: 4px 8px 4px calc(6px + var(--depth) * 14px);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.errorRow {
+  font-size: 12px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row,
+  .rootRow,
+  .showHidden {
+    transition: none;
+  }
+}

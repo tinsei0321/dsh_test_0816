@@ -29,6 +29,13 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Turn wall-clock span, muted against the strong title, tabular digits. */
+.duration {
+  font: var(--dsw-font-xs-13);
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-tertiary);
+}
+
 .columns {
   flex: none;
   display: flex;

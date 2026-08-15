@@ -1,0 +1,109 @@
+/* Codex-styled dark palette (Phase 5 visual override).
+ *
+ * This sheet never renames or drops a --dsw token: it adds a Codex static
+ * stage and re-points the existing semantic aliases under
+ * body[data-ds-dark-theme], so every consumer keeps reading the alias names
+ * it already uses (DiffBlock, InputBar, TrajectoryTable, ...) and picks up
+ * the Codex values through them. The light theme is untouched; the existing
+ * blue stays available as the secondary accent through the unrepointed
+ * --dsw-static-deepseek-* aliases (button-info-fill, ContextMeter tint).
+ *
+ * Dark-only alias re-pointing (Codex value on the right):
+ *   bg-base                      #0E0F12  charcoal app base
+ *   bg-layer-1                   #202123  slate cards/panels
+ *   bg-layer-2                   #2A2B2E  inputs, one rung above cards
+ *   bg-layer-3                   #333438  menus/elevated plates, top rung
+ *   bg-module-platform           #202123  settings rows join the slate ladder
+ *   specific-sidebar-fill        #17181B  sidebar, below the card rung
+ *   specific-sidebar-nav-item-*  slate rungs; active-accent #10A37F green
+ *   markdown-code-block          #202123  code cards share the surface rung
+ *   markdown-code-block-banner   #2A2B2E
+ *   markdown-inline-code         #2A2B2E
+ *   specific-bubble / -highlight #202123 / #2A2B2E  user message plates
+ *   label-primary                #F5F7FA  mist
+ *   label-secondary              #9EA1AA  steel
+ *   label-tertiary / caption     rgba(255,255,255,.55 / .45)
+ *   state-business-primary       #10A37F  brand green replaces DeepSeek blue
+ *   state-business-tertiary      rgba(16,163,127,.12)  green-tinted fill
+ *   brand-primary-new-color...   #10A37F  selection marks join the green
+ *   state-success-primary        #34C759  success and diff additions
+ *   state-error-primary          #FF5F57  errors and diff removals
+ *   border-inverted{,2} / l1     rgba(255,255,255,.08)  hairline
+ *   scrollbar-*                  #40434A graphite, #4E5159 hover
+ *   toast-bg / tooltip-bg        #333438  elevated slate plates
+ *   linear-gradient-think        charcoal fade (replaces the old #151517)
+ */
+
+/* Static stage: Codex palette constants. Declared on body like the other
+ * stages; only the dark alias block below consumes them. */
+body {
+  --dsw-static-codex-charcoal: rgb(14, 15, 18);
+  --dsw-static-codex-slate: rgb(32, 33, 35);
+  --dsw-static-codex-slate-2: rgb(42, 43, 46);
+  --dsw-static-codex-slate-3: rgb(51, 52, 56);
+  --dsw-static-codex-sidebar: rgb(23, 24, 27);
+  --dsw-static-codex-mist: rgb(245, 247, 250);
+  --dsw-static-codex-steel: rgb(158, 161, 170);
+  --dsw-static-codex-green: rgb(16, 163, 127);
+  --dsw-static-codex-graphite: rgb(64, 67, 74);
+  --dsw-static-codex-graphite-hover: rgb(78, 81, 89);
+  --dsw-static-codex-success: rgb(52, 199, 89);
+  --dsw-static-codex-error: rgb(255, 95, 87);
+}
+
+body[data-ds-dark-theme] {
+  /* Backgrounds: charcoal base with a slate surface ladder. */
+  --dsw-alias-bg-base: var(--dsw-static-codex-charcoal);
+  --dsw-alias-bg-layer-1: var(--dsw-static-codex-slate);
+  --dsw-alias-bg-layer-2: var(--dsw-static-codex-slate-2);
+  --dsw-alias-bg-layer-3: var(--dsw-static-codex-slate-3);
+  --dsw-alias-bg-module-platform: var(--dsw-static-codex-slate);
+  --dsw-specific-sidebar-fill: var(--dsw-static-codex-sidebar);
+  --dsw-specific-sidebar-nav-item-hover: var(--dsw-static-codex-slate);
+  --dsw-specific-sidebar-nav-item-active: var(--dsw-static-codex-slate-2);
+  --dsw-specific-sidebar-nav-item-active-accent: var(--dsw-static-codex-green);
+
+  /* Code surfaces: code cards sit on the surface rung, banners and inline
+   * code chips one rung above. */
+  --dsw-alias-markdown-code-block: var(--dsw-static-codex-slate);
+  --dsw-alias-markdown-code-block-banner: var(--dsw-static-codex-slate-2);
+  --dsw-alias-markdown-inline-code: var(--dsw-static-codex-slate-2);
+
+  /* User message plates: slate, not blue-gray. */
+  --dsw-specific-bubble: var(--dsw-static-codex-slate);
+  --dsw-specific-bubble-highlight: var(--dsw-static-codex-slate-2);
+
+  /* Text: mist primary, steel secondary, white-alpha tertiary/caption. */
+  --dsw-alias-label-primary: var(--dsw-static-codex-mist);
+  --dsw-alias-label-secondary: var(--dsw-static-codex-steel);
+  --dsw-alias-label-tertiary: rgba(255, 255, 255, 0.55);
+  --dsw-alias-label-caption: rgba(255, 255, 255, 0.45);
+
+  /* Accent: green takes the business/brand emphasis from DeepSeek blue. */
+  --dsw-alias-state-business-primary: var(--dsw-static-codex-green);
+  --dsw-alias-state-business-tertiary: rgba(16, 163, 127, 0.12);
+  --dsw-alias-brand-primary-new-colorprimary-new-color: var(--dsw-static-codex-green);
+
+  /* Status: Codex success/error; DiffBlock and StateDot follow these. */
+  --dsw-alias-state-success-primary: var(--dsw-static-codex-success);
+  --dsw-alias-state-error-primary: var(--dsw-static-codex-error);
+
+  /* Hairlines: one step lighter than the base 0.06. */
+  --dsw-alias-border-inverted: rgba(255, 255, 255, 0.08);
+  --dsw-alias-border-inverted2: rgba(255, 255, 255, 0.08);
+  --dsw-alias-border-l1: rgba(255, 255, 255, 0.08);
+
+  /* Scrollbar thumbs: graphite, the Codex stroke gray. */
+  --dsw-alias-scrollbar-bg-l1: var(--dsw-static-codex-graphite);
+  --dsw-alias-scrollbar-bg-l2: var(--dsw-static-codex-graphite);
+  --dsw-alias-scrollbar-hover-l1: var(--dsw-static-codex-graphite-hover);
+  --dsw-alias-scrollbar-hover-l2: var(--dsw-static-codex-graphite-hover);
+
+  /* Elevated plates: the top slate rung. */
+  --dsw-alias-toast-bg: var(--dsw-static-codex-slate-3);
+  --dsw-alias-tooltip-bg: var(--dsw-static-codex-slate-3);
+
+  /* Thinking-block fade tracks the new base/surface colors. */
+  --dsw-linear-gradient-think: linear-gradient(180deg, var(--dsw-static-codex-charcoal) 20.19%, rgba(14, 15, 18, 0) 100%);
+  --dsw-linear-think-select: linear-gradient(180deg, var(--dsw-static-codex-slate) 20.19%, rgba(32, 33, 35, 0) 100%);
+}

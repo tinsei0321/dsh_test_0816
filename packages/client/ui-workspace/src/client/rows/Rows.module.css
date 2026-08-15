@@ -13,11 +13,25 @@
   cursor: pointer;
   user-select: none;
   color: var(--dsw-alias-label-primary);
+  transition:
+    background-color 120ms var(--ds-ease-in-out),
+    color 120ms var(--ds-ease-in-out);
 }
 
 .projectRow:hover,
 .sessionRow:hover {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.projectRow:active,
+.sessionRow:active {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.projectRow:focus-visible,
+.sessionRow:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--dsw-alias-border-l3);
 }
 
 .sessionRow.selected {
@@ -38,10 +52,20 @@
   cursor: pointer;
   text-align: left;
   color: var(--dsw-alias-label-primary);
+  transition: background-color 120ms var(--ds-ease-in-out);
 }
 
 .searchResultRow:hover {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.searchResultRow:active {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.searchResultRow:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--dsw-alias-border-l3);
 }
 
 .searchResultRow.selected {
@@ -93,7 +117,8 @@
   color: var(--dsw-alias-label-secondary);
 }
 
-/* Compact one-line Workspace row after removing the session-count subtitle. */
+/* Compact one-line Workspace row; the session-count caption trails the title
+   and swaps out for the hover action cluster (projectRow:hover below). */
 .projectRow {
   height: 34px;
   align-items: center;
@@ -104,13 +129,38 @@
   height: 20px;
 }
 
-/* Session cell (figma): pad 8, a 16px status slot, then a 4px title gap. */
+.projectCount {
+  flex: none;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.projectRow:hover .projectCount,
+.projectRow.menuOpen .projectCount {
+  display: none;
+}
+
+/* The group holding the selected session stays highlighted while folded or
+   open: the folder glyph takes the business tint and the title gains weight. */
+.projectRow.current .title {
+  font-weight: 500;
+}
+
+/* Session cell (figma): pad 8, a 16px status slot, then a 4px title gap.
+   Grouped rows indent one hierarchy step (22px) under their Workspace
+   header; the flat list resets to the shared 8px row padding. */
 .sessionRow {
   height: 32px;
   gap: 0;
+  padding-left: 22px;
   /* Mount fade: session rows appear by unfolding a group (or the tree
      mounting). Stable row keys keep already-visible rows from replaying it. */
   animation: row-in 150ms var(--ds-ease-in-out);
+}
+
+.flatSessionRow {
+  padding-left: 8px;
 }
 
 .sessionRow .title {
@@ -286,7 +336,9 @@
   bottom: -7px;
 }
 
-/* Hover-card body (figma 169:16903): dark surface, fixed colors both themes. */
+/* Hover-card body (figma 169:16903): dark surface, fixed colors both themes.
+   Values harmonized with the Codex dark palette (mist/steel/55% white) so the
+   fixed-dark card reads as one family with the Codex theme. */
 .hoverContent {
   display: flex;
   flex-direction: column;
@@ -296,21 +348,21 @@
 .hoverTitle {
   font-size: 14px;
   line-height: 20px;
-  color: #FFFFFF;
+  color: #F5F7FA;
   overflow-wrap: break-word;
 }
 
 .hoverPath {
   font-size: 12px;
   line-height: 16px;
-  color: #CFD3D6;
+  color: #9EA1AA;
   word-break: break-all;
 }
 
 .hoverTime {
   font-size: 12px;
   line-height: 16px;
-  color: #CFD3D6;
+  color: #9EA1AA;
 }
 
 .hoverStatus {
@@ -319,7 +371,7 @@
   gap: 8px;
   font-size: 12px;
   line-height: 20px;
-  color: #ADB2B8;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .iconButton {
@@ -338,6 +390,7 @@
 }
 
 .iconButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
 }
 
@@ -349,7 +402,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sessionRow,
-  .arrow {
+  .arrow,
+  .projectRow,
+  .searchResultRow {
     animation: none;
     transition: none;
   }

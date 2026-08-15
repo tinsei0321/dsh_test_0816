@@ -444,7 +444,7 @@
 .chip {
   position: relative;
   border-radius: 6px;
-  background: rgba(97, 135, 216, 0.22);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 22%, transparent);
 }
 
 .chip::before {
@@ -470,7 +470,7 @@
 }
 
 .chipInvalid {
-  background: rgba(216, 97, 97, 0.2);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 20%, transparent);
   text-decoration: line-through;
   opacity: 0.7;
 }

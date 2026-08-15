@@ -15,7 +15,9 @@ import { act, cleanup, render } from '@testing-library/react'
 import { useSyncExternalStore } from 'react'
 import { AppFrame } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import type { AppFrameProps } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
-import { SIDEBAR_COLLAPSED } from '@deepseek-ai/dsh-client-ui-layout/src/client/columns.ts'
+import {
+  DETAILS_DEFAULT, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, TREE_COLLAPSED, TREE_DEFAULT,
+} from '@deepseek-ai/dsh-client-ui-layout/src/client/columns.ts'
 import { createLayoutStore } from '@deepseek-ai/dsh-client-ui-layout/src/client/stores.ts'
 import type {
   SessionId, SessionListState, WorkspaceListState,
@@ -61,6 +63,7 @@ function mountFrame() {
     if (key === 'sidebar') return <div data-testid="sidebar-content" />
     if (key === 'conversation') return <div data-testid="center-content" />
     if (key === 'details') return <div data-testid="details-content" />
+    if (key === 'frame.projectTree') return <div data-testid="tree-content" />
     if (key === 'conversation.empty') return <div data-testid="empty-content" />
     return <div data-testid="other-content" />
   }) as AppFrameProps['renderSlot']
@@ -70,10 +73,10 @@ function mountFrame() {
       ids: current === undefined ? [] : [current],
       byId: current === undefined
         ? {}
-        : { [current]: { id: current, displayTitle: 'Test', running: false, blank: selectedSessionBlank.current, updatedAt: 1 } },
+        : { [current]: { id: current, displayTitle: current, running: false, blank: selectedSessionBlank.current, updatedAt: 0 } },
       current,
       phase: 'ready',
-    } as SessionListState
+    } as unknown as SessionListState
     return sel(sessionState)
   }) as never
   const workspaceState: WorkspaceListState = {
@@ -95,10 +98,11 @@ function mountFrame() {
   return { instance, frame, slotCalls, rerenderFrame: () => { utils.rerender(element()) }, ...utils }
 }
 
+/** The fixed-width tracks (sidebar, details, tree); center is the 1fr track. */
 function tracks(frame: HTMLElement): number[] {
-  const m = /^(\d+)px minmax\(0, 1fr\) (\d+)px$/.exec(frame.style.gridTemplateColumns)
+  const m = /^(\d+)px minmax\(0, 1fr\) (\d+)px (\d+)px$/.exec(frame.style.gridTemplateColumns)
   if (m === null) throw new Error(`unexpected template: ${frame.style.gridTemplateColumns}`)
-  return [Number(m[1]), Number(m[2])]
+  return [Number(m[1]), Number(m[2]), Number(m[3])]
 }
 
 function drag(handle: Element, fromX: number, toX: number): void {
@@ -137,21 +141,26 @@ afterEach(() => {
 })
 
 describe('AppFrame', () => {
-  it('renders three tracks from store state', () => {
+  it('renders four tracks from store state', () => {
     const { frame } = mountFrame()
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
   })
 
-  it('renders the session pair with empty owner shares (sessionId is framework-standard)', () => {
+  it('renders the four occupants with empty owner shares for the session pair', () => {
     const { slotCalls, getByTestId } = mountFrame()
+    expect(getByTestId('sidebar-content')).toBeTruthy()
     expect(getByTestId('center-content')).toBeTruthy()
     expect(getByTestId('details-content')).toBeTruthy()
+    expect(getByTestId('tree-content')).toBeTruthy()
     const keys = slotCalls.map(c => c.key)
+    expect(keys).toContain('sidebar')
     expect(keys).toContain('conversation')
     expect(keys).toContain('details')
+    expect(keys).toContain('frame.projectTree')
     expect(keys).not.toContain('conversation.empty')
     expect(slotCalls.find(c => c.key === 'conversation')!.props).toEqual({})
     expect(slotCalls.find(c => c.key === 'details')!.props).toEqual({})
+    expect(slotCalls.find(c => c.key === 'frame.projectTree')!.props).toEqual({ collapsed: false, width: TREE_DEFAULT })
   })
 
   it('keeps the conversation slot mounted while no session is current', () => {
@@ -174,55 +183,56 @@ describe('AppFrame', () => {
 
   it('ignores unselected states and closes only when the Session id changes', () => {
     const { frame, instance, rerenderFrame } = mountFrame()
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
 
     act(() => { instance.actions.openDetails() })
-    expect(tracks(frame)).toEqual([280, 360])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, DETAILS_DEFAULT, TREE_DEFAULT])
 
     selectedSession.current = 's-next' as SessionId
     act(() => { rerenderFrame() })
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
 
     act(() => { instance.actions.openDetails() })
     selectedSession.current = 's-blank' as SessionId
     selectedSessionBlank.current = true
     act(() => { rerenderFrame() })
-    expect(tracks(frame)).toEqual([280, 0])
-    expect(instance.getSnapshot().details).toBe(360)
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
+    expect(instance.getSnapshot().details).toBe(DETAILS_DEFAULT)
 
     selectedSession.current = 's-next' as SessionId
     selectedSessionBlank.current = false
     act(() => { rerenderFrame() })
-    expect(tracks(frame)).toEqual([280, 360])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, DETAILS_DEFAULT, TREE_DEFAULT])
 
     selectedSession.current = undefined
     act(() => { rerenderFrame() })
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
     selectedSession.current = 's-test' as SessionId
     act(() => { rerenderFrame() })
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
   })
 
   it('keeps details closed when the first Session materializes', () => {
     selectedSession.current = undefined
     const { frame, instance, rerenderFrame } = mountFrame()
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
     expect(instance.getSnapshot().details).toBe(0)
 
     selectedSession.current = 's-first' as SessionId
     act(() => { rerenderFrame() })
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
   })
 
-  it('sidebar slot receives live concession output as owner props', () => {
+  it('sidebar and tree slots receive live concession output as owner props', () => {
     const { slotCalls } = mountFrame()
-    expect(slotCalls.find(c => c.key === 'sidebar')!.props).toEqual({ collapsed: false, width: 280 })
+    expect(slotCalls.find(c => c.key === 'sidebar')!.props).toEqual({ collapsed: false, width: SIDEBAR_DEFAULT })
+    expect(slotCalls.find(c => c.key === 'frame.projectTree')!.props).toEqual({ collapsed: false, width: TREE_DEFAULT })
   })
 
   it('sidebar drag widens through rAF-batched pointer moves', () => {
     const { frame } = mountFrame()
     const handles = frame.querySelectorAll('[class*="handle"]')
-    drag(handles[0]!, 280, 350)
+    drag(handles[0]!, SIDEBAR_DEFAULT, 350)
     expect(tracks(frame)[0]).toBe(350)
   })
 
@@ -231,22 +241,42 @@ describe('AppFrame', () => {
     act(() => { instance.actions.openDetails() })
     const handles = frame.querySelectorAll('[class*="handle"]')
     drag(handles[1]!, 1560, 1500)
-    expect(tracks(frame)[1]).toBe(420)
+    expect(tracks(frame)[1]).toBe(DETAILS_DEFAULT + 60)
+  })
+
+  it('tree drag widens leftward (negative dx grows the column)', () => {
+    const { frame } = mountFrame()
+    const handles = frame.querySelectorAll('[class*="handle"]')
+    drag(handles[1]!, 1920 - TREE_DEFAULT, 1920 - TREE_DEFAULT - 60)
+    expect(tracks(frame)[2]).toBe(TREE_DEFAULT + 60)
+  })
+
+  it('toggles the details pane on Cmd/Ctrl+Alt+B', () => {
+    const { frame } = mountFrame()
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', metaKey: true, altKey: true }))
+    })
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, DETAILS_DEFAULT, TREE_DEFAULT])
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', ctrlKey: true, altKey: true }))
+    })
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
   })
 
   it('drag base is the rendered (concession-clamped) width, not the preference', () => {
-    frameWidth = 1250 // step-2 squeeze: details renders 330 while preference is 360
+    frameWidth = 1500 // step-2 squeeze: details renders 340 while preference is DETAILS_DEFAULT
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.openDetails() })
-    expect(tracks(frame)).toEqual([280, 330])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 340, TREE_DEFAULT])
     const handles = frame.querySelectorAll('[class*="handle"]')
-    drag(handles[1]!, 920, 930) // shrink by 10 from the rendered width
-    expect(instance.getSnapshot().details).toBe(320)
+    drag(handles[1]!, 1500 - TREE_DEFAULT - 340, 1500 - TREE_DEFAULT - 330) // shrink by 10 from the rendered width
+    expect(instance.getSnapshot().details).toBe(330)
   })
 
   it('details column stays mounted at zero width', () => {
     const { frame, getByTestId } = mountFrame()
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
     expect(getByTestId('details-content')).toBeTruthy()
     expect(frame.hasAttribute('data-details-collapsed')).toBe(true)
   })
@@ -254,32 +284,45 @@ describe('AppFrame', () => {
   it('closed sidebar keeps its compact rail with mounted slot content and collapsed owner props', () => {
     const { frame, instance, slotCalls, getByTestId } = mountFrame()
     act(() => { instance.actions.toggleSidebar() })
-    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0, TREE_DEFAULT])
     expect(getByTestId('sidebar-content')).toBeTruthy()
     expect(frame.hasAttribute('data-sidebar-collapsed')).toBe(true)
     const lastSidebarCall = slotCalls.filter(c => c.key === 'sidebar').at(-1)!
     expect(lastSidebarCall.props).toEqual({ collapsed: true, width: SIDEBAR_COLLAPSED })
   })
 
+  it('closed tree keeps its compact rail with mounted slot content and collapsed owner props', () => {
+    const { frame, instance, slotCalls, getByTestId } = mountFrame()
+    act(() => { instance.actions.toggleTree() })
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_COLLAPSED])
+    expect(getByTestId('tree-content')).toBeTruthy()
+    expect(frame.hasAttribute('data-tree-collapsed')).toBe(true)
+    const lastTreeCall = slotCalls.filter(c => c.key === 'frame.projectTree').at(-1)!
+    expect(lastTreeCall.props).toEqual({ collapsed: true, width: TREE_COLLAPSED })
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
+  })
+
   it('viewport shrink triggers the concession chain via ResizeObserver', () => {
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.openDetails() })
-    frameWidth = 1250
+    frameWidth = 1500
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([280, 330])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 340, TREE_DEFAULT])
     frameWidth = 1920
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([280, 360])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, DETAILS_DEFAULT, TREE_DEFAULT])
   })
 
   it('drag handles disappear for collapsed columns', () => {
     const { frame, instance } = mountFrame()
-    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
-    act(() => { instance.actions.openDetails() })
     expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(2)
+    act(() => { instance.actions.openDetails() })
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(3)
     act(() => { instance.actions.closeDetails() })
-    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(2)
     act(() => { instance.actions.toggleSidebar() })
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
+    act(() => { instance.actions.toggleTree() })
     expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(0)
   })
 })
@@ -288,21 +331,22 @@ describe('AppFrame — narrow-viewport auto-collapse', () => {
   it('mounts collapsed below the breakpoint with no sidebar handle', () => {
     frameWidth = 980
     const { frame, slotCalls } = mountFrame()
-    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0, TREE_DEFAULT])
     expect(frame.hasAttribute('data-sidebar-collapsed')).toBe(true)
     expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({ collapsed: true, width: SIDEBAR_COLLAPSED })
-    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(0)
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
   })
 
-  it('narrow toggle re-expands over the squeezed center and back', () => {
+  it('narrow toggle re-expands over the squeezed center (the tree concedes to its rail) and back', () => {
     frameWidth = 980
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.toggleSidebar() })
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_COLLAPSED])
     expect(frame.hasAttribute('data-sidebar-collapsed')).toBe(false)
+    expect(frame.hasAttribute('data-tree-collapsed')).toBe(true)
     expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(1)
     act(() => { instance.actions.toggleSidebar() })
-    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0, TREE_DEFAULT])
   })
 
   it('a wide-closed preference re-expands at the contract default while narrow', () => {
@@ -312,7 +356,7 @@ describe('AppFrame — narrow-viewport auto-collapse', () => {
     frameWidth = 980
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
     act(() => { instance.actions.toggleSidebar() })
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_COLLAPSED])
     expect(instance.getSnapshot().sidebar).toBe(0) // preference untouched
   })
 
@@ -321,10 +365,10 @@ describe('AppFrame — narrow-viewport auto-collapse', () => {
     act(() => { instance.actions.setSidebar(400) })
     frameWidth = 980
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_COLLAPSED, 0, TREE_DEFAULT])
     frameWidth = 1920
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([400, 0])
+    expect(tracks(frame)).toEqual([400, 0, TREE_DEFAULT])
   })
 })
 
@@ -345,7 +389,7 @@ describe('AppFrame — guard branches', () => {
   it('two moves inside one frame coalesce through the pending rAF', () => {
     const { frame, instance } = mountFrame()
     const handle = frame.querySelectorAll('[class*="handle"]')[0]!
-    act(() => { handle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 280, bubbles: true })) })
+    act(() => { handle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: SIDEBAR_DEFAULT, bubbles: true })) })
     act(() => {
       // Two moves before the frame flushes: the second must ride the pending
       // rAF (frame.current ??= guard), and the flush sees the latest x.
@@ -360,7 +404,7 @@ describe('AppFrame — guard branches', () => {
   it('pointerup with a pending rAF cancels it and commits the final position', () => {
     const { frame, instance } = mountFrame()
     const handle = frame.querySelectorAll('[class*="handle"]')[0]!
-    act(() => { handle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: 280, bubbles: true })) })
+    act(() => { handle.dispatchEvent(new PointerEvent('pointerdown', { pointerId: 1, clientX: SIDEBAR_DEFAULT, bubbles: true })) })
     act(() => {
       handle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientX: 360, bubbles: true }))
       // No timer advance: the rAF is still pending when pointerup arrives.
@@ -374,7 +418,7 @@ describe('AppFrame — guard branches', () => {
     frameWidth = 0
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
     // Track template still reflects the last non-zero viewport.
-    expect(tracks(frame)).toEqual([280, 0])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 0, TREE_DEFAULT])
   })
 })
 
@@ -391,8 +435,8 @@ describe('AppFrame — unmount with an in-flight resize frame', () => {
   it('double resize inside one frame rides the pending rAF (??= guard)', () => {
     const { frame, instance } = mountFrame()
     act(() => { instance.actions.openDetails() })
-    frameWidth = 1250
+    frameWidth = 1500
     act(() => { fireResize?.(); fireResize?.(); vi.advanceTimersByTime(20) })
-    expect(tracks(frame)).toEqual([280, 330])
+    expect(tracks(frame)).toEqual([SIDEBAR_DEFAULT, 340, TREE_DEFAULT])
   })
 })

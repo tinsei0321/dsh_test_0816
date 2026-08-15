@@ -14,7 +14,7 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- text: Explain event sourcing in one sentence. {{clock}}
+- text: Step 1 Completed Explain event sourcing in one sentence. {{clock}}
 - button "Copy":
   - img
 - button "Context injection @deepseek-ai/dsh-system-prompt":
@@ -34,7 +34,7 @@
   - img
 - button "Branch into a new conversation":
   - img
-- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s Now give the same explanation to a human reader. {{clock}}
+- text: {{clock}} Ran for {{duration}} TTFT {{duration}} {{throughput}} tok/s Step 1 Completed Now give the same explanation to a human reader. {{clock}}
 - button "Copy":
   - img
 - button "Think The user is asking for a one-sentence description of event sourcing. This is a straightforward knowledge question that doesn't require any skill loading or tool calls.":

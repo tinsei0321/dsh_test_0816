@@ -56,8 +56,8 @@ export interface ProducedFilesInjected {
   }
 }
 
-/** Matched paths plus the opener, locale, and injected Host capability. */
-export type ProducedFilesProps = Pick<TurnTailOwnerProps, 'openFile'> & {
+/** Matched paths plus the openers, locale, and injected Host capability. */
+export type ProducedFilesProps = Pick<TurnTailOwnerProps, 'openFile' | 'openDocument'> & {
   matched: readonly string[]
 } & PropsLocale<typeof NS> & InjectFace<ProducedFilesInjected>
 
@@ -71,7 +71,7 @@ function moreLabel(t: ProducedFilesProps['t'], count: number): string {
  * @returns The produced-files row.
  */
 export function ProducedFiles({
-  matched: paths, openFile, isLoopback, useHostDescription, t,
+  matched: paths, openFile, openDocument, isLoopback, useHostDescription, t,
 }: ProducedFilesProps) {
   const hostCanOpenPath = useHostDescription(description => description?.canOpenPath === true)
   const canOpenPath = isLoopback && hostCanOpenPath
@@ -125,7 +125,7 @@ export function ProducedFiles({
             // that share a basename; the chip itself stays short.
             title={path}
             aria-label={t('produced.open', { name: path })}
-            onClick={() => { openFile(path) }}
+            onClick={() => { openDocument(path) }}
           >
             {basename(path)}
           </button>

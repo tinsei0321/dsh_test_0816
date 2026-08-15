@@ -29,6 +29,8 @@ export interface TrajectoryGroupModel {
 /** One sticky turn, or a standalone compaction section between turns. */
 export interface TrajectoryTurnModel {
   turn: number | null
+  /** Wall-clock span across the turn's timed cells, in milliseconds; absent when fewer than one timed cell. */
+  durationMs?: number | null
   groups: readonly TrajectoryGroupModel[]
 }
 
@@ -604,7 +606,31 @@ function toTurnModel(
       cells: laid.map(l => l.cell),
     }
   })
-  return { turn, groups }
+  // Codex-style turn header fact: the whole turn's wall-clock span, from the
+  // earliest timed cell to the latest (tool cells extend to their result time).
+  const durationMs = turnWallSpanMs(entry.groups.flatMap(group => group.laid))
+  return { turn, ...(durationMs === null ? {} : { durationMs }), groups }
+}
+
+/**
+ * Wall-clock span in milliseconds across the given cells; tool cells extend to
+ * their result time so a lone call still spans call→result. Null when no cell
+ * carries a usable time.
+ * @param laid - the turn's laid cells.
+ * @returns the span, or null.
+ */
+function turnWallSpanMs(laid: readonly LaidCell[]): number | null {
+  const times: number[] = []
+  for (const l of laid) {
+    if (l.absTime === null || !Number.isFinite(l.absTime)) continue
+    times.push(l.absTime)
+    if (l.cell.kind === 'tool' && l.cell.timeSeconds !== null && Number.isFinite(l.cell.timeSeconds)) {
+      times.push(l.absTime + l.cell.timeSeconds * 1000)
+    }
+  }
+  if (times.length >= 2) return Math.max(...times) - Math.min(...times)
+  const own = times.length === 1 ? laid.find(l => l.absTime === times[0])?.cell.timeSeconds : null
+  return own !== null && own !== undefined && Number.isFinite(own) ? own * 1000 : null
 }
 
 /** Chronological section position from the fold's monotonically assigned cell indexes. */

@@ -10,7 +10,7 @@
     - tab "Chat" [selected]
     - tab "Trajectory"
 - img
-- text: "plan Plan mode on. Use /plan off to leave. Plan a small change: add a --greeting flag to a CLI. Do not read or write any files. Call exit_plan_mode with a short plan of at most five bullet points. Once the plan is approved, reply with the single word DONE and stop. {{clock}}"
+- text: "plan Plan mode on. Use /plan off to leave. Step 1 Completed Plan a small change: add a --greeting flag to a CLI. Do not read or write any files. Call exit_plan_mode with a short plan of at most five bullet points. Once the plan is approved, reply with the single word DONE and stop. {{clock}}"
 - button "Copy":
   - img
 - button "Context injection @deepseek-ai/dsh-system-prompt":
@@ -25,10 +25,11 @@
   - text: Since the user has explicitly asked me not to read or write any files and to go straight to planning, I'll proceed with
   - code: exit_plan_mode
   - text: .
-- 'button "Tool call exit_plan_mode · # Add `--greeting` flag to CLI"':
+- 'button "Tool call exit_plan_mode · # Add `--greeting` flag to CLI {{duration}}"':
   - img
   - img
-  - text: "Tool call exit_plan_mode · # Add `--greeting` flag to CLI"
+  - text: "Tool call exit_plan_mode · # Add `--greeting` flag to CLI {{duration}}"
+- text: Step 2 Completed
 - 'button "Think The plan was approved. The user''s last instruction says: \"Once the plan is approved, reply with the single word DONE and stop.\" So I should just reply with DONE and stop."':
   - img
   - img

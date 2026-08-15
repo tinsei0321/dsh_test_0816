@@ -59,7 +59,10 @@ export function apply(ctx: ClientContext): void {
       // no vocabulary — the two surfaces agree by construction.
       const paths = selectProducedFiles(owner)
       if (paths === null) return undefined
-      return producedFileMentions(paths, owner.openFile, path => t('produced.open', { name: path }))
+      // File references open in the details panel's document tab (Codex
+      // follow); the Host opener stays the native fallback for surfaces
+      // without the panel.
+      return producedFileMentions(paths, owner.openDocument, path => t('produced.open', { name: path }))
     },
   }
   ctx.provide('chatFileMentions', mentions)

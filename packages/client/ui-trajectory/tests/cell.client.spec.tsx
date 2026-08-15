@@ -10,7 +10,7 @@ import {
   TrajectoryCell,
   type TrajectoryCellKind,
 } from '../src/client/TrajectoryCell.tsx'
-import { formatDurationMillis } from '../src/client/trajectory-record.ts'
+import { formatCompactDurationMs, formatDurationMillis } from '../src/client/trajectory-record.ts'
 
 afterEach(cleanup)
 
@@ -38,6 +38,18 @@ describe('formatElapsedSeconds', () => {
     expect(formatElapsedSeconds(0.5)).toBe('500 ms')
     expect(formatElapsedSeconds(1.5)).toBe('1,500 ms')
     expect(formatElapsedSeconds(Number.NaN)).toBe('—')
+  })
+})
+
+describe('formatCompactDurationMs', () => {
+  it('formats compact Codex-style section labels', () => {
+    expect(formatCompactDurationMs(0)).toBe('0 ms')
+    expect(formatCompactDurationMs(42)).toBe('42 ms')
+    expect(formatCompactDurationMs(1_234)).toBe('1.2 s')
+    expect(formatCompactDurationMs(59_000)).toBe('59.0 s')
+    expect(formatCompactDurationMs(65_000)).toBe('1m 05s')
+    expect(formatCompactDurationMs(-1)).toBe('—')
+    expect(formatCompactDurationMs(Number.NaN)).toBe('—')
   })
 })
 

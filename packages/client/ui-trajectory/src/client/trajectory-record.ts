@@ -128,3 +128,18 @@ export function formatDurationMillis(milliseconds: number | null): string {
 export function formatElapsedSeconds(seconds: number | null): string {
   return formatDurationMillis(seconds === null ? null : seconds * 1000)
 }
+
+/**
+ * Format a wall-clock duration in milliseconds as a compact Codex-style label
+ * (`42 ms`, `1.2 s`, `2m 05s`) for turn/step section headers.
+ * @param ms - non-negative duration in milliseconds.
+ * @returns the compact label.
+ */
+export function formatCompactDurationMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return formatDurationMillis(null)
+  if (ms < 1000) return `${Math.round(ms)} ms`
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)} s`
+  const minutes = Math.floor(ms / 60000)
+  const seconds = Math.round((ms % 60000) / 1000)
+  return `${minutes}m ${String(seconds).padStart(2, '0')}s`
+}

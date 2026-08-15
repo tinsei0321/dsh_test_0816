@@ -29,4 +29,23 @@ export interface ChatStoreState {
    * persisted snapshots from before this field rehydrate without it.
    */
   inspect: { callId: CallId } | null
+  /**
+   * Which half of the details panel the details column shows. Selecting a
+   * tool call flips it back to `tool`; `openDocument` flips it to `document`.
+   * Optional: persisted snapshots from before this field rehydrate without
+   * it — consumers coerce with `?? 'tool'`.
+   */
+  detailsTab?: 'tool' | 'document'
+  /**
+   * The document-tab's open file tabs, in open order (first = oldest).
+   * Optional: persisted snapshots from before this field rehydrate without
+   * it — consumers coerce with `?? []`.
+   */
+  openDocs?: readonly string[]
+  /**
+   * The document-tab's focused file, or null when no tab is open. Optional:
+   * persisted snapshots from before this field rehydrate without it —
+   * consumers coerce with `?? null`.
+   */
+  activeDoc?: string | null
 }

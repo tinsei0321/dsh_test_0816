@@ -9,7 +9,7 @@
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"
-- text: Use the ask_user_question tool to ask me exactly one question with id "checkpoint", question "Ready to continue?", header "Checkpoint", and options labeled "Yes" and "No". After I answer, reply with one short sentence acknowledging my answer and stop. {{clock}}
+- text: Step 1 Completed Use the ask_user_question tool to ask me exactly one question with id "checkpoint", question "Ready to continue?", header "Checkpoint", and options labeled "Yes" and "No". After I answer, reply with one short sentence acknowledging my answer and stop. {{clock}}
 - button "Copy":
   - img
 - button "Context injection @deepseek-ai/dsh-system-prompt":
@@ -24,7 +24,7 @@
   - img
   - img
   - text: Ask question 1/1 answered
-- text: "Interjection: include the word BANANA in your final reply. {{clock}}"
+- text: "Step 2 Completed Interjection: include the word BANANA in your final reply. {{clock}}"
 - button "Copy":
   - img
 - text: "Interjection: include the word ORANGE in your final reply. {{clock}}"

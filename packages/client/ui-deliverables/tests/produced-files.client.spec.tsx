@@ -75,8 +75,9 @@ function tailOwner(
   seq: number,
   openFile: (path: string) => void = () => {},
   turn = 1,
+  openDocument: (path: string) => void = () => {},
 ): TurnTailOwnerProps {
-  return { seq, openFile, turn: turnLocation(turn, data) }
+  return { seq, openFile, openDocument, turn: turnLocation(turn, data) }
 }
 
 interface TimelineSnapshot {
@@ -309,6 +310,7 @@ describe('ProducedFiles row', () => {
   it('keeps one measured line, updates on resize, and opens a file or the workspace folder', () => {
     const paths = ['deep/a.html', 'b.css', 'c.ts', 'd.ts', 'e.ts', 'f.ts', 'g.ts']
     const openFile = vi.fn<(path: string) => void>()
+    const openDocument = vi.fn<(path: string) => void>()
     let available = 226
     let resize: ResizeObserverCallback | undefined
     const disconnect = vi.fn()
@@ -337,7 +339,7 @@ describe('ProducedFiles row', () => {
       })
 
     const view = render(
-      <ProducedFiles matched={paths} openFile={openFile} {...capability(true)} t={t} />,
+      <ProducedFiles matched={paths} openFile={openFile} openDocument={openDocument} {...capability(true)} t={t} />,
     )
     expect(view.getByText('产物')).toBeTruthy()
     const row = view.container.querySelector('[data-produced-files-row]')
@@ -350,7 +352,10 @@ describe('ProducedFiles row', () => {
     expect(chip.getAttribute('title')).toBe('deep/a.html')
     expect(view.queryByRole('button', { name: '打开 g.ts' })).toBeNull()
     fireEvent.click(chip)
-    expect(openFile).toHaveBeenCalledWith('deep/a.html')
+    // Chips open in the details panel's document tab (Codex follow) — the
+    // component's openDocument prop, not the host opener.
+    expect(openFile).not.toHaveBeenCalledWith('deep/a.html')
+    expect(openDocument).toHaveBeenCalledWith('deep/a.html')
 
     const showFolder = view.getByRole('button', { name: '在文件夹中显示' })
     fireEvent.click(showFolder)
@@ -371,7 +376,7 @@ describe('ProducedFiles row', () => {
     // shrinks; the replacement observer must skip those stale slots.
     observeNode.mockClear()
     view.rerender(
-      <ProducedFiles matched={paths.slice(0, 1)} openFile={openFile} {...capability(true)} t={t} />,
+      <ProducedFiles matched={paths.slice(0, 1)} openFile={openFile} openDocument={vi.fn()} {...capability(true)} t={t} />,
     )
     expect(within(row).getAllByRole('button')).toHaveLength(1)
     expect(observeNode).toHaveBeenCalledTimes(3)
@@ -384,12 +389,12 @@ describe('ProducedFiles row', () => {
   it('keeps the folder action absent without overflow or a local native opener', () => {
     const openFile = vi.fn<(path: string) => void>()
     const view = render(
-      <ProducedFiles matched={['a.md']} openFile={openFile} {...capability(true)} t={t} />,
+      <ProducedFiles matched={['a.md']} openFile={openFile} openDocument={vi.fn()} {...capability(true)} t={t} />,
     )
     const overflowing = ['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md']
     expect(view.queryByRole('button', { name: '在文件夹中显示' })).toBeNull()
     for (const unavailable of [capability(false), capability(true, false), capability(undefined)]) {
-      view.rerender(<ProducedFiles matched={overflowing} openFile={openFile} {...unavailable} t={t} />)
+      view.rerender(<ProducedFiles matched={overflowing} openFile={openFile} openDocument={vi.fn()} {...unavailable} t={t} />)
       expect(view.queryByRole('button', { name: '在文件夹中显示' })).toBeNull()
     }
   })
@@ -398,7 +403,7 @@ describe('ProducedFiles row', () => {
     const view = render(
       <ProducedFiles
         matched={['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md']}
-        openFile={() => {}}
+        openFile={() => {}} openDocument={() => {}}
         {...capability(false)}
         t={makeTranslate(en)}
       />,
@@ -478,11 +483,13 @@ describe('plugin registration', () => {
     expect(entry?.inject?.()).toEqual({ isLoopback: false, hooks: { hostDescription } })
 
     // The prose face is live while the plugin is: a produced turn yields a
-    // resolver whose matches open through the owner-supplied opener.
+    // resolver whose matches open through the owner's document-tab opener.
     const opened: string[] = []
     const owner = tailOwner(
       produced([2, 'site/report.html']),
       3,
+      () => {},
+      1,
       (path) => { opened.push(path) },
     )
     const service = (ctx as unknown as { get(name: string): ChatFileMentions | undefined }).get('chatFileMentions')

@@ -14,7 +14,7 @@ import type { ViewTab } from './contract/views.ts'
 import type {
   ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
   ComposerChainProps, ConversationInjected, ConversationSessionHeaderInjected, ConversationSessionInjected,
-  DetailsInjected,
+  DetailsInjected, DocumentOpen, DocumentOpenRequest,
 } from './contract/slots.ts'
 import type { InputNotice } from './input/contract.ts'
 import { createChatStore } from './stores.ts'
@@ -133,6 +133,29 @@ export function apply(ctx: Context): void {
   const submissionPolicy = new ComposerSubmissionPolicy(
     ctx.settingsScope.bind<ConversationSettings>({ namespace: CONVERSATION_SETTINGS_NAMESPACE }),
   )
+
+  // The cross-panel document opener: one apply-time source published through
+  // the `documentOpen` service (any browser plugin opens a file into the
+  // details panel's document tab), consumed by the details entry's inject
+  // hooks compartment below. The token forces a fresh frame for repeat paths.
+  let docOpenRequest: DocumentOpenRequest | null = null
+  const docOpenListeners = new Set<() => void>()
+  const docOpenSource = {
+    getSnapshot: () => docOpenRequest,
+    subscribe: (fn: () => void) => {
+      docOpenListeners.add(fn)
+      return () => { docOpenListeners.delete(fn) }
+    },
+  }
+  const publishRequest = (path: string | null): void => {
+    docOpenRequest = { path, token: (docOpenRequest?.token ?? 0) + 1 }
+    for (const fn of docOpenListeners) fn()
+  }
+  const documentOpen: DocumentOpen = {
+    open: (path: string) => { publishRequest(path) },
+    openPanel: () => { publishRequest(null) },
+  }
+  ctx.provide('documentOpen', documentOpen)
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -399,6 +422,7 @@ export function apply(ctx: Context): void {
             // app surfaces its own error dialog when the path is unusable.
           })
         },
+        openDocument: (path) => { documentOpen.open(path) },
         loadOlder: () => { void scoped.loadOlder() },
         loadImage: attachment => conversation.resolveImage(sessionId, attachment),
         // Unregistered 'trajectory' id is safe: the tab ring falls back to
@@ -446,10 +470,20 @@ export function apply(ctx: Context): void {
     locale: NS,
     children: {
       'conversation.details.tool': { kind: 'single', scope: 'session' },
+      'conversation.details.document': { kind: 'single', scope: 'session' },
     },
     store: chatStore,
-    inject: (): DetailsInjected => ({
+    inject: (_sessionId: SessionId, actions: BoundActions<typeof chatStore>): DetailsInjected => ({
       closeDetails: () => { layout.closeDetails() },
+      openDocument: (path) => {
+        layout.expandDetails()
+        actions.openDocument(path)
+      },
+      openDocumentPanel: () => {
+        layout.openDetails()
+        actions.setDetailsTab('document')
+      },
+      hooks: { docOpenRequest: docOpenSource },
     }),
   }, DetailsPanel)
 

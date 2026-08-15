@@ -74,11 +74,13 @@ async function loadComposition(): Promise<Context> {
 }
 
 /** GET (by default) one path against the running server; returns status, content-type, and a body prefix. */
-async function request(port: number, path: string, init?: RequestInit): Promise<{ status: number; type: string | null; body: string }> {
+interface RequestResult { status: number; type: string | null; cache: string | null; body: string }
+async function request(port: number, path: string, init?: RequestInit): Promise<RequestResult> {
   const response = await fetch(`http://127.0.0.1:${String(port)}${path}`, init)
   return {
     status: response.status,
     type: response.headers.get('content-type'),
+    cache: response.headers.get('cache-control'),
     body: (await response.text()).slice(0, 80),
   }
 }
@@ -114,6 +116,8 @@ describe('real Loader composition', () => {
       expect(got.status).toBe(200)
       expect(got.body).toContain('__T__')
       expect(got.body).toContain('shell')
+      // The boot manifest (bundle revs) must never ride a heuristic cache.
+      expect(got.cache).toBe('no-store')
     }
     untap()
     expect((await request(port, '/')).body).not.toContain('__T__')

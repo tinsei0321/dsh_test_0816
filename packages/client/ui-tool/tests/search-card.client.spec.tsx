@@ -27,6 +27,12 @@ import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-conversation/src/client
 import { SearchRow, searchToolview } from '../src/client/tool/toolviews/search-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
 
+/** Absent cross-panel open request for direct DetailsPanel hosts. */
+const absentDocRequest = bindSnapshotSelector({
+  getSnapshot: () => null as { path: string; token: number } | null,
+  subscribe: () => () => {},
+})
+
 /** SearchRow now composes ToolRow, so its props include the locale `t` seat. */
 type SearchRowProps = Parameters<typeof SearchRow>[0]
 
@@ -186,7 +192,7 @@ describe('searchCardModel', () => {
 
 describe('chat row search body (GenericToolCard fallback)', () => {
   const ownerProps = (block: RunningToolCall | ToolResultNode, toolName: string): GenericToolCardProps => ({
-    callId: 'c1', toolName, block, openFile: vi.fn(), t,
+    callId: 'c1', toolName, block, openFile: vi.fn(), openDocument: vi.fn(), t,
   })
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
   const toggleRow = (view: { container: HTMLElement }) => {
@@ -409,6 +415,9 @@ describe('DetailsPanel Output section (search)', () => {
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
         closeDetails={vi.fn()}
+        openDocument={vi.fn()}
+        openDocumentPanel={vi.fn()}
+        useDocOpenRequest={absentDocRequest}
         t={t}
       />,
     )

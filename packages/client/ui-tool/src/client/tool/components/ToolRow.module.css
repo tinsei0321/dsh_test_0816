@@ -98,6 +98,18 @@
   color: var(--dsw-alias-label-tertiary);
 }
 
+/* Settled call's elapsed chip (Codex exec-row duration): right of the summary,
+   muted caption tone, tabular digits so streaming rows don't jitter width. */
+.duration {
+  flex: none;
+  margin-left: 8px;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-caption);
+}
+
 /* File-tool path: same geometry as .summary, with a persistent link affordance. */
 .fileLink {
   flex: 1 1 auto;

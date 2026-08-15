@@ -3,7 +3,7 @@ import type {
   SessionId, SessionListState, SessionSummary, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, workspaceLabel, relativeTime,
+  deriveFlat, deriveGroups, deriveSearchResults, workspaceLabel, sessionTimeBucket,
   UNGROUPED_KEY, UNGROUPED_LABEL,
 } from '../src/client/tree.ts'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
@@ -437,14 +437,43 @@ describe('workspaceLabel', () => {
   })
 })
 
-describe('relativeTime', () => {
-  it('buckets current, minute, hour, day, month, and year distances', () => {
-    const now = 400 * 24 * 60 * 60 * 1_000
-    expect(relativeTime(now, now)).toEqual({ unit: 'now', n: 0 })
-    expect(relativeTime(now - 5 * 60_000, now)).toEqual({ unit: 'minutes', n: 5 })
-    expect(relativeTime(now - 3 * 3_600_000, now)).toEqual({ unit: 'hours', n: 3 })
-    expect(relativeTime(now - 2 * 86_400_000, now)).toEqual({ unit: 'days', n: 2 })
-    expect(relativeTime(now - 60 * 86_400_000, now)).toEqual({ unit: 'months', n: 2 })
-    expect(relativeTime(0, now)).toEqual({ unit: 'years', n: 1 })
+describe('sessionTimeBucket', () => {
+  // Local-time dates keep the calendar arithmetic deterministic in any TZ.
+  const at = (year: number, month: number, day: number, hour = 0, minute = 0): number =>
+    new Date(year, month - 1, day, hour, minute).getTime()
+
+  it('buckets fresh distances as now and minutes, including future clock skew', () => {
+    const now = at(2026, 8, 14, 10, 0)
+    expect(sessionTimeBucket(now, now)).toEqual({ unit: 'now' })
+    expect(sessionTimeBucket(now + 60_000, now)).toEqual({ unit: 'now' })
+    expect(sessionTimeBucket(now - 59_000, now)).toEqual({ unit: 'now' })
+    expect(sessionTimeBucket(now - 5 * 60_000, now)).toEqual({ unit: 'minutes', n: 5 })
+  })
+
+  it('keeps minutes across midnight while the distance stays under an hour', () => {
+    const now = at(2026, 8, 14, 0, 20)
+    expect(sessionTimeBucket(at(2026, 8, 13, 23, 50), now)).toEqual({ unit: 'minutes', n: 30 })
+  })
+
+  it('reports hours only within the same calendar day', () => {
+    const now = at(2026, 8, 14, 23, 0)
+    expect(sessionTimeBucket(at(2026, 8, 14, 1, 0), now)).toEqual({ unit: 'hours', n: 22 })
+  })
+
+  it('pins the previous calendar day as yesterday with its clock time', () => {
+    const now = at(2026, 8, 14, 10, 0)
+    expect(sessionTimeBucket(at(2026, 8, 13, 23, 45), now))
+      .toEqual({ unit: 'yesterday', hour: 23, minute: 45 })
+    // The year boundary is calendar arithmetic too.
+    expect(sessionTimeBucket(at(2025, 12, 31, 23, 45), at(2026, 1, 1, 10, 0)))
+      .toEqual({ unit: 'yesterday', hour: 23, minute: 45 })
+  })
+
+  it('falls back to month-day inside the current year and year-month-day before it', () => {
+    const now = at(2026, 8, 14, 10, 0)
+    expect(sessionTimeBucket(at(2026, 8, 5, 9, 0), now)).toEqual({ unit: 'date', month: 8, day: 5 })
+    expect(sessionTimeBucket(at(2026, 1, 2, 9, 0), now)).toEqual({ unit: 'date', month: 1, day: 2 })
+    expect(sessionTimeBucket(at(2025, 12, 31, 9, 0), now))
+      .toEqual({ unit: 'dateFull', year: 2025, month: 12, day: 31 })
   })
 })

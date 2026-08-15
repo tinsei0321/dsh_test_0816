@@ -71,6 +71,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'details': { kind: 'single'; scope: 'session'; owner: DetailsOwnerProps }
     /**
+     * The rightmost column: the project directory tree, always present
+     * (collapsing keeps a compact re-open rail). OCCUPIED by ui-project's
+     * ProjectTree, which opens files in the details column's document view —
+     * so the document reader and the directory tree sit side by side, the
+     * tree at the far right edge. The occupant receives the column's live
+     * state (collapsed, width) and is expected to render the compact rail
+     * while collapsed.
+     */
+    'frame.projectTree': { kind: 'single'; scope: 'root'; owner: ProjectTreeOwnerProps }
+    /**
      * Frame-wide floating layer, above every column and outside their scroll
      * containers. Deliberately generic and unowned by any feature: a badge, a
      * toast stack or a status pill all belong here, and entries order among
@@ -104,6 +114,14 @@ export interface ConvOwnerProps {}
 /** Details owner share: empty — sessionId arrives as a framework-standard prop. */
 export interface DetailsOwnerProps {}
 
+/** Project-tree owner share: live column state from the frame's concession solve. */
+export interface ProjectTreeOwnerProps {
+  /** True when the tree column is closed to its compact re-open rail. */
+  collapsed: boolean
+  /** Rendered column width in px (TREE_COLLAPSED when collapsed). */
+  width: number
+}
+
 /** Required services (cordis fiber inject — the loader passes all module exports as an object plugin). */
 export const inject = ['slots', 'theme']
 
@@ -123,6 +141,7 @@ export function apply(ctx: ClientContext): void {
         'sidebar': { kind: 'single', scope: 'root' },
         'conversation': { kind: 'single', scope: 'session-maybe' },
         'details': { kind: 'single', scope: 'session' },
+        'frame.projectTree': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
       },
       // Exclusive store: the factory itself — the framework instantiates per

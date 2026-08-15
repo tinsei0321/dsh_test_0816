@@ -1,12 +1,15 @@
-// DetailsPanel: close button + the selected call's args and
+// DetailsPanel: close button + a two-tab strip (tool details | documents)
+// over the column body. The tool tab shows the selected call's args and
 // result — args as JSON, the result raw except for a terminal-card call, whose
-// Output section is the command's terminal card. Reads the
+// Output section is the command's terminal card. The document tab renders the
+// 'conversation.details.document' child slot with the pinned path and this
+// panel's store actions as the owner currency. Reads the
 // selection from the shared chat
 // store (conversation writes, this panel reads — the cross-registration
 // share the store seat exists for) and derives the call material from the
 // session snapshot — no data of its own.
 
-import { Fragment } from 'react'
+import { Fragment, useCallback, useEffect, useRef } from 'react'
 import { CodeBlock } from '@deepseek-ai/dsh-client-ui-primitives'
 import { shallowEqual } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSnapshot, RunningToolCall, ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
@@ -63,8 +66,18 @@ function rawResultText(block: ToolCallBlock): string {
   return parts.join('\n')
 }
 
-export function DetailsPanel({ useSession, useSessions, sessionId, useStore, renderSlot, closeDetails, t }: DetailsPanelProps) {
+/** The details panel's two halves. */
+type DetailsTab = 'tool' | 'document'
+
+export function DetailsPanel({
+  useSession, useSessions, sessionId, useStore, actions, renderSlot, closeDetails, openDocument, openDocumentPanel, useDocOpenRequest, t,
+}: DetailsPanelProps) {
+  // Per-fact selectors: the shared chat store also carries the composer draft,
+  // which must not re-render the details panel on every keystroke.
   const selection = useStore(s => s.selection)
+  const detailsTab = useStore(s => s.detailsTab)
+  const openDocs = useStore(s => s.openDocs)
+  const activeDoc = useStore(s => s.activeDoc)
   // Session workspace root: an omitted or relative terminal cwd resolves
   // against it, which the pure presenter cannot see.
   const sessionCwd = useSessions(list => list.byId[sessionId]?.cwd)
@@ -75,11 +88,37 @@ export function DetailsPanel({ useSession, useSessions, sessionId, useStore, ren
     s => (callId === undefined ? null : materialFor(s, callId)),
     (a, b) => shallowEqual(a, b))
 
+  // Cross-panel opens (tool rows / file links publish through the documentOpen
+  // service): every fresh request opens the column, pinning the path or
+  // showing the document tab alone (a null-path panel request).
+  const request = useDocOpenRequest(s => s)
+  const handledToken = useRef(0)
+  useEffect(() => {
+    if (request === null || request.token === handledToken.current) return
+    handledToken.current = request.token
+    if (request.path === null) openDocumentPanel()
+    else openDocument(request.path)
+  }, [request, openDocument, openDocumentPanel])
+
+  // Persisted snapshots from before the two-panel split rehydrate without
+  // these fields; the tool tab is the stable default.
+  const tab: DetailsTab = detailsTab ?? 'tool'
+  const docs = openDocs ?? []
+  const doc = activeDoc ?? null
+
+  // The document child slot's complete write surface: open appends/focuses a
+  // tab and keeps the document tab; close removes the tab (the store returns
+  // the panel to the tool half when the last tab closes).
+  const onOpenDocument = useCallback((path: string) => { actions.openDocument(path) }, [actions])
+  const onCloseDocument = useCallback((path: string) => { actions.closeDocument(path) }, [actions])
+
   return (
     <div className={css.root}>
       <div className={css.header}>
         <div className={css.title}>
-          {selection === null ? t('details.title') : material?.name ?? selection.toolName ?? t('details.title')}
+          {tab === 'document'
+            ? t('details.tab.document')
+            : selection === null ? t('details.title') : material?.name ?? selection.toolName ?? t('details.title')}
         </div>
         <button
           type="button" className={css.close} aria-label={t('details.close')}
@@ -90,39 +129,67 @@ export function DetailsPanel({ useSession, useSessions, sessionId, useStore, ren
           </svg>
         </button>
       </div>
-      <div className={css.body}>
-        {selection === null || callId === undefined
-          ? <div className={css.empty}>{t('details.empty')}</div>
-          : material === null
-            ? <div className={css.empty}>{t('details.notInWindow')}</div>
-            : (
-              <>
-                {material.argsRaw !== null && (
+      <div className={css.tabs} role="tablist" aria-label={t('details.title')}>
+        <button
+          type="button" role="tab" aria-selected={tab === 'tool'}
+          className={tab === 'tool' ? css.tabActive : css.tab}
+          onClick={() => { actions.setDetailsTab('tool') }}
+        >
+          {t('details.tab.tool')}
+        </button>
+        <button
+          type="button" role="tab" aria-selected={tab === 'document'}
+          className={tab === 'document' ? css.tabActive : css.tab}
+          onClick={() => { actions.setDetailsTab('document') }}
+        >
+          {t('details.tab.document')}
+        </button>
+      </div>
+      <div className={css.body} role="tabpanel">
+        {tab === 'document'
+          ? (
+            <Fragment key="document">
+              {renderSlot('conversation.details.document', {
+                docs,
+                doc,
+                onOpen: onOpenDocument,
+                onClose: onCloseDocument,
+                cwd: sessionCwd,
+              })}
+            </Fragment>
+          )
+          : selection === null || callId === undefined
+            ? <div className={css.empty}>{t('details.empty')}</div>
+            : material === null
+              ? <div className={css.empty}>{t('details.notInWindow')}</div>
+              : (
+                <>
+                  {material.argsRaw !== null && (
+                    <section className={css.section}>
+                      <div className={css.sectionLabel}>{t('details.input')}</div>
+                      <CodeBlock code={pretty(material.argsRaw)} lang="json" copyLabel={t('copy')} copiedLabel={t('copied')} />
+                    </section>
+                  )}
                   <section className={css.section}>
-                    <div className={css.sectionLabel}>{t('details.input')}</div>
-                    <CodeBlock code={pretty(material.argsRaw)} lang="json" copyLabel={t('copy')} copiedLabel={t('copied')} />
+                    <div className={css.sectionLabel}>{t('details.output')}</div>
+                    {/* Keyed by the selected call: the body owns per-call view
+                        state (the terminal card's expand and copy), which React
+                        would otherwise carry into the next selection because the
+                        panel does not unmount between calls. */}
+                    <Fragment key={callId}>
+                      {renderSlot('conversation.details.tool', { block: material.block, cwd: sessionCwd }, {
+                        fallback: 'kind' in material.block
+                          ? (
+                            <pre className={css.code} data-error={material.block.isError || undefined}>
+                              {rawResultText(material.block)}
+                            </pre>
+                          )
+                          : <div className={css.empty}>{t('details.running')}</div>,
+                      })}
+                    </Fragment>
                   </section>
-                )}
-                <section className={css.section}>
-                  <div className={css.sectionLabel}>{t('details.output')}</div>
-                  {/* Keyed by the selected call: the body owns per-call view
-                      state (the terminal card's expand and copy), which React
-                      would otherwise carry into the next selection because the
-                      panel does not unmount between calls. */}
-                  <Fragment key={callId}>
-                    {renderSlot('conversation.details.tool', { block: material.block, cwd: sessionCwd }, {
-                      fallback: 'kind' in material.block
-                        ? (
-                          <pre className={css.code} data-error={material.block.isError || undefined}>
-                            {rawResultText(material.block)}
-                          </pre>
-                        )
-                        : <div className={css.empty}>{t('details.running')}</div>,
-                    })}
-                  </Fragment>
-                </section>
-              </>
-            )}
+                </>
+              )}
       </div>
     </div>
   )

@@ -49,6 +49,39 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* Two-half tab strip under the header: full-width buttons sharing the
+   column's border language; the active half takes the brand underline. */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.tab,
+.tabActive {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 0 7px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.tabActive {
+  border-bottom-color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
+
 .body {
   flex: 1;
   min-height: 0;

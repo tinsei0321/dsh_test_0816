@@ -423,27 +423,31 @@ describe('WorkspaceBrowser', () => {
       [currentBlank, staleBlank],
       { current: currentBlank.id },
     )
+    // The blank row's localized display label is "新会话"; the row-scoped
+    // projection keeps only the current session's blank row visible.
+    const newSessionRows = () => screen.getAllByRole('treeitem')
+      .filter(row => row.textContent?.includes('新会话'))
     const b = mount({
       useSessions: hook(sessions),
       useWorkspaces: hook(workspaceState([
         workspace('alpha', ['alpha-blank']), workspace('beta', ['beta-blank']),
       ])),
     })
-    expect(screen.getByText('新会话')).toBeTruthy()
+    expect(newSessionRows()).toHaveLength(1)
     expect(screen.queryByText('alpha-blank')).toBeNull()
     expect(screen.queryByText('beta-blank')).toBeNull()
 
     rerender(b, { useSessions: hook({ ...sessions, current: staleBlank.id }) })
-    expect(screen.getAllByText('新会话')).toHaveLength(1)
+    expect(newSessionRows()).toHaveLength(1)
     b.store.actions.setGroupBy('flat')
     rerender(b, {})
-    expect(screen.getAllByText('新会话')).toHaveLength(1)
+    expect(newSessionRows()).toHaveLength(1)
     // Search excludes blank rows entirely — neither the canonical stored
     // title nor the localized display label participates in matching.
     fireEvent.change(screen.getByPlaceholderText('搜索会话…'), { target: { value: 'new session' } })
-    expect(screen.queryByText('新会话')).toBeNull()
+    expect(screen.getByRole('tree', { name: '搜索结果' }).textContent).not.toContain('新会话')
     fireEvent.change(screen.getByPlaceholderText('搜索会话…'), { target: { value: '新会话' } })
-    expect(screen.queryByText('新会话')).toBeNull()
+    expect(screen.getByRole('tree', { name: '搜索结果' }).textContent).not.toContain('新会话')
   })
 
   it('shows local metadata matches immediately, then clears back to the grouped tree', async () => {
@@ -662,14 +666,16 @@ describe('WorkspaceBrowser', () => {
     }
   })
 
-  it('shows the no-sessions empty state in both modes and resolves an empty search', async () => {
+  it('shows the no-sessions empty state with its New Session hint in both modes and resolves an empty search', async () => {
     vi.useFakeTimers()
     try {
       const b = mount()
       expect(screen.getByText('暂无会话')).toBeTruthy()
+      expect(screen.getByText('点击上方“新会话”开始新的对话。')).toBeTruthy()
       b.store.actions.setGroupBy('flat')
       rerender(b, {})
       expect(screen.getByText('暂无会话')).toBeTruthy()
+      expect(screen.getByText('点击上方“新会话”开始新的对话。')).toBeTruthy()
       fireEvent.change(screen.getByPlaceholderText('搜索会话…'), { target: { value: 'x' } })
       expect(screen.getByText('正在搜索会话历史…')).toBeTruthy()
       await act(async () => { await vi.advanceTimersByTimeAsync(250) })
@@ -697,6 +703,21 @@ describe('WorkspaceBrowser', () => {
       // Wide search button is decorative (tabIndex -1, no expand call).
       fireEvent.click(screen.getByRole('button', { name: '搜索会话' }))
       expect(expandSidebar).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('Cmd/Ctrl+G expands the sidebar and lands in the search box', () => {
+    vi.useFakeTimers()
+    try {
+      const expandSidebar = vi.fn()
+      const b = mount({ wide: false, expandSidebar })
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', metaKey: true }))
+      expect(expandSidebar).toHaveBeenCalledTimes(1)
+      rerender(b, { wide: true })
+      act(() => { vi.advanceTimersByTime(300) })
+      expect(document.activeElement).toBe(screen.getByPlaceholderText('搜索会话…'))
     } finally {
       vi.useRealTimers()
     }

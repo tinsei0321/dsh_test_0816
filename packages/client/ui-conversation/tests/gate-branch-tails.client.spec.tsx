@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
 import {
   createSnapshotStore, EMPTY_CHAT_SNAPSHOT, EMPTY_CONVERSATION_VIEWS,
@@ -9,7 +9,9 @@ import {
 import type { UseSession } from '@deepseek-ai/dsh-client-web-react'
 import type { ConversationSnapshot, SessionId, SessionListState, WorkspaceListState } from '@deepseek-ai/dsh-client-runtime/client'
 import type { SessionProviderComponent } from '@deepseek-ai/dsh-client-ui-slots'
-import type { DetailsSlotProps, DetailsToolOwnerProps, SelectionTarget } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {
+  DetailsDocumentOwnerProps, DetailsSlotProps, DetailsToolOwnerProps, SelectionTarget,
+} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { createChatStore } from '../src/client/stores.ts'
@@ -18,6 +20,12 @@ import { StatsLine } from '../src/client/chat/StatsLine.tsx'
 import { DetailsPanel } from '../src/client/skeleton/DetailsPanel.tsx'
 import { zh } from '../src/client/locales.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
+
+/** Absent cross-panel open request for direct DetailsPanel hosts. */
+const absentDocRequest = bindSnapshotSelector({
+  getSnapshot: () => null as { path: string; token: number } | null,
+  subscribe: () => () => {},
+})
 
 // Mirrors the real lookup chain (conversation namespace, then common).
 const t: AssistantMarkdownProps['t'] = makeTranslate(zh, commonZh)
@@ -136,6 +144,9 @@ describe('render branch tails', () => {
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
         closeDetails={vi.fn()}
+        openDocument={vi.fn()}
+        openDocumentPanel={vi.fn()}
+        useDocOpenRequest={absentDocRequest}
         t={t}
       />,
     )
@@ -193,6 +204,9 @@ describe('render branch tails', () => {
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
         closeDetails={vi.fn()}
+        openDocument={vi.fn()}
+        openDocumentPanel={vi.fn()}
+        useDocOpenRequest={absentDocRequest}
         t={t}
       />,
     )
@@ -206,5 +220,152 @@ describe('render branch tails', () => {
       call: { name: 'read', argsRaw: '{"path":"notes/demo.txt"}' },
       content: [{ type: 'text', text: longText }],
     })
+  })
+
+  it('DetailsPanel switches halves: the document tab renders the seat and routes open/close through the store', () => {
+    localStorage.clear()
+    const snap = snapshotBase()
+    // A selected in-flight call keeps the tool half rendering its seat, so the
+    // tab switch visibly replaces one seat with the other.
+    snap.runningCalls = [{
+      callId: 'r1', name: 'bash', argsRaw: '{}', turn: 1, step: 1, time: 1, callView: null, subCalls: [],
+    }]
+    snap.chat = chatSnapshotFixture({ runningCalls: snap.runningCalls })
+    const chat = createChatStore().create()
+    chat.actions.select({ turnSeq: 1, callId: 'r1' })
+    const documentOwners: DetailsDocumentOwnerProps[] = []
+    const probe = ((key: string, owner?: unknown) => {
+      if (key === 'conversation.details.document') {
+        documentOwners.push(owner as DetailsDocumentOwnerProps)
+        return <div data-testid="document-seat" />
+      }
+      return <div data-testid="tool-details-seat" />
+    }) as DetailsSlotProps['renderSlot']
+    const emptyList = createSnapshotStore<SessionListState>(
+      { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+    const emptyWorkspaces = createSnapshotStore<WorkspaceListState>({
+      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      baselinesReady: true, recentWorkspaceId: undefined,
+    })
+    const view = render(
+      <DetailsPanel
+        SessionProvider={SessionProviderStub}
+        renderSlot={probe}
+        sessionId={SID}
+        useSession={bindSnapshotSelector({ getSnapshot: () => snap, subscribe: () => () => {} })}
+        useSessions={bindSnapshotSelector(emptyList)}
+        useWorkspaces={bindSnapshotSelector(emptyWorkspaces)}
+        useProjection={(() => undefined)}
+        useInput={(() => { throw new Error('unused') })}
+        inputActions={{
+          setDraft: () => {},
+          addImages: () => true,
+          removeImage: () => {},
+          pruneImages: () => {},
+          submit: () => {},
+        }}
+        useStore={bindSnapshotSelector(chat)}
+        actions={chat.actions}
+        closeDetails={vi.fn()}
+        openDocument={vi.fn()}
+        openDocumentPanel={vi.fn()}
+        useDocOpenRequest={absentDocRequest}
+        t={t}
+      />,
+    )
+    // Default half: the tool seat renders, the document seat never mounts.
+    expect(view.getByTestId('tool-details-seat')).toBeTruthy()
+    expect(view.queryByTestId('document-seat')).toBeNull()
+    expect(documentOwners).toHaveLength(0)
+
+    // The tab button flips the panel to the document half.
+    fireEvent.click(view.getByRole('tab', { name: '文档' }))
+    expect(view.queryByTestId('tool-details-seat')).toBeNull()
+    expect(view.getByTestId('document-seat')).toBeTruthy()
+    expect(documentOwners).toHaveLength(1)
+    expect(documentOwners[0]?.doc).toBeNull()
+    expect(documentOwners[0]?.docs).toEqual([])
+
+    // Opening through the owner currency appends a tab and focuses it.
+    act(() => { documentOwners[documentOwners.length - 1]?.onOpen?.('notes/demo.txt') })
+    expect(chat.store.getSnapshot().openDocs).toEqual(['notes/demo.txt'])
+    expect(chat.store.getSnapshot().activeDoc).toBe('notes/demo.txt')
+    expect(chat.store.getSnapshot().detailsTab).toBe('document')
+    expect(documentOwners[documentOwners.length - 1]?.doc).toBe('notes/demo.txt')
+    expect(documentOwners[documentOwners.length - 1]?.docs).toEqual(['notes/demo.txt'])
+
+    // Closing through the same currency removes the last tab and the store
+    // returns the panel to the tool half.
+    act(() => { documentOwners[documentOwners.length - 1]?.onClose?.('notes/demo.txt') })
+    expect(chat.store.getSnapshot().openDocs).toEqual([])
+    expect(chat.store.getSnapshot().activeDoc).toBeNull()
+    expect(chat.store.getSnapshot().detailsTab).toBe('tool')
+    expect(view.getByTestId('tool-details-seat')).toBeTruthy()
+  })
+
+  it('DetailsPanel consumes a published open request through the injected request hook', () => {
+    localStorage.clear()
+    const snap = snapshotBase()
+    const chat = createChatStore().create()
+    const openDocument = vi.fn()
+    const openDocumentPanel = vi.fn()
+    let request: { path: string | null; token: number } | null = null
+    const listeners = new Set<() => void>()
+    const requestSource = {
+      getSnapshot: () => request,
+      subscribe: (fn: () => void) => {
+        listeners.add(fn)
+        return () => { listeners.delete(fn) }
+      },
+    }
+    const useDocOpenRequest = bindSnapshotSelector(requestSource)
+    const emptyList = createSnapshotStore<SessionListState>(
+      { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+    const emptyWorkspaces = createSnapshotStore<WorkspaceListState>({
+      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      baselinesReady: true, recentWorkspaceId: undefined,
+    })
+    const panelElement = () => (
+      <DetailsPanel
+        SessionProvider={SessionProviderStub}
+        renderSlot={renderToolDetailsProbe()}
+        sessionId={SID}
+        useSession={bindSnapshotSelector({ getSnapshot: () => snap, subscribe: () => () => {} })}
+        useSessions={bindSnapshotSelector(emptyList)}
+        useWorkspaces={bindSnapshotSelector(emptyWorkspaces)}
+        useProjection={(() => undefined)}
+        useInput={(() => { throw new Error('unused') })}
+        inputActions={{
+          setDraft: () => {},
+          addImages: () => true,
+          removeImage: () => {},
+          pruneImages: () => {},
+          submit: () => {},
+        }}
+        useStore={bindSnapshotSelector(chat)}
+        actions={chat.actions}
+        closeDetails={vi.fn()}
+        openDocument={openDocument}
+        openDocumentPanel={openDocumentPanel}
+        useDocOpenRequest={useDocOpenRequest}
+        t={t}
+      />
+    )
+    render(panelElement())
+    expect(openDocument).not.toHaveBeenCalled()
+    // A published request routes into the injected write path.
+    request = { path: 'notes/x.txt', token: 1 }
+    act(() => { for (const fn of listeners) fn() })
+    expect(openDocument).toHaveBeenCalledWith('notes/x.txt')
+    // Re-opening the same path re-publishes with a bumped token: the panel
+    // consumes the second frame instead of deduping by path.
+    request = { path: 'notes/x.txt', token: 2 }
+    act(() => { for (const fn of listeners) fn() })
+    expect(openDocument).toHaveBeenCalledTimes(2)
+    // A panel-only request (no path) opens the document tab without a pin.
+    request = { path: null, token: 3 }
+    act(() => { for (const fn of listeners) fn() })
+    expect(openDocumentPanel).toHaveBeenCalledTimes(1)
+    expect(openDocument).toHaveBeenCalledTimes(2)
   })
 })

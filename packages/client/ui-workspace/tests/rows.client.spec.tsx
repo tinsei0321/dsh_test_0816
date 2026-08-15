@@ -386,19 +386,94 @@ describe('workspace browser rows', () => {
       const wrapper = screen.getByRole('treeitem').parentElement as HTMLElement
       fireEvent.pointerEnter(wrapper)
       act(() => { vi.advanceTimersByTime(500) })
-      // Card body: full title + relative time + running status.
+      // Card body: full title + relative time + running status; the row's
+      // trailing label carries the same relative time.
       expect(screen.getAllByText('Hovered')).toHaveLength(2)
-      expect(screen.getByText('1分钟前')).toBeTruthy()
+      expect(screen.getAllByText('1分钟前')).toHaveLength(2)
       expect(screen.getAllByText('进行中')).toHaveLength(2)
       fireEvent.pointerLeave(wrapper)
-      // Menu open (disabled=true) suppresses the card for the same hover.
+      // Menu open (disabled=true) suppresses the card for the same hover:
+      // the row keeps its label, the card's duplicates disappear.
       fireEvent.click(screen.getByRole('button', { name: '会话“Hovered”的操作' }))
       fireEvent.pointerEnter(wrapper)
       act(() => { vi.advanceTimersByTime(1000) })
-      expect(screen.queryByText('1分钟前')).toBeNull()
+      expect(screen.getAllByText('Hovered')).toHaveLength(1)
+      expect(screen.getAllByText('1分钟前')).toHaveLength(1)
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('formats older activity as calendar ladder labels on the row and hover card', () => {
+    vi.useFakeTimers()
+    try {
+      const at = (year: number, month: number, day: number, hour = 0, minute = 0): number =>
+        new Date(year, month - 1, day, hour, minute).getTime()
+      const now = at(2026, 8, 14, 10, 0)
+      const node: SessionNode = {
+        id: sid('s1'), title: 'Old', blank: false, running: false,
+        runningSubagentCount: 0, completed: false, updatedAt: at(2026, 8, 14, 1, 0),
+      }
+      const view = render(<SessionNodeItem node={node} currentId={undefined} now={now} onOpen={vi.fn()}
+        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+      expect(screen.getByText('9小时前')).toBeTruthy()
+
+      const yesterday = { ...node, updatedAt: at(2026, 8, 13, 23, 45) }
+      view.rerender(<SessionNodeItem node={yesterday} currentId={undefined} now={now} onOpen={vi.fn()}
+        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+      expect(screen.getByText('昨天 23:45')).toBeTruthy()
+
+      const thisYear = { ...node, updatedAt: at(2026, 8, 5) }
+      view.rerender(<SessionNodeItem node={thisYear} currentId={undefined} now={now} onOpen={vi.fn()}
+        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+      expect(screen.getByText('08-05')).toBeTruthy()
+
+      const olderYear = { ...node, updatedAt: at(2025, 12, 31) }
+      view.rerender(<SessionNodeItem node={olderYear} currentId={undefined} now={now} onOpen={vi.fn()}
+        onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+      expect(screen.getByText('2025-12-31')).toBeTruthy()
+
+      // The hover card repeats the same calendar label.
+      fireEvent.pointerEnter(screen.getByRole('treeitem').parentElement as HTMLElement)
+      act(() => { vi.advanceTimersByTime(500) })
+      expect(screen.getAllByText('2025-12-31')).toHaveLength(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('activates the session row with Enter and Space like a click', () => {
+    const onOpen = vi.fn()
+    const node: SessionNode = {
+      id: sid('s1'), title: 'Keyboard', blank: false, running: false,
+      runningSubagentCount: 0, completed: false, updatedAt: 0,
+    }
+    render(<SessionNodeItem node={node} currentId={undefined} now={0} onOpen={onOpen}
+      onRename={vi.fn()} onFork={vi.fn()} onArchive={vi.fn()} t={t} />)
+    const row = screen.getByRole('treeitem')
+    expect(row.tabIndex).toBe(0)
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(onOpen).toHaveBeenCalledWith(node.id)
+    fireEvent.keyDown(row, { key: ' ' })
+    expect(onOpen).toHaveBeenCalledTimes(2)
+    fireEvent.keyDown(row, { key: 'ArrowDown' })
+    expect(onOpen).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows the group session count and activates the project row with Enter', () => {
+    const onToggle = vi.fn()
+    const group: GroupNode = {
+      key: 'project', workspaceId: wid('project'), cwd: '/projects/project', createdAt: 0, label: 'Project',
+      sessionCount: 2, expanded: false, containsCurrent: true, sessions: [],
+    }
+    render(<ProjectRowItem group={group} onToggle={onToggle} onCreate={vi.fn()} t={t} />)
+    expect(screen.getByText('2 个会话')).toBeTruthy()
+    const row = screen.getByRole('treeitem')
+    expect(row.tabIndex).toBe(0)
+    fireEvent.keyDown(row, { key: 'Enter' })
+    expect(onToggle).toHaveBeenCalledOnce()
+    fireEvent.keyDown(row, { key: 'x' })
+    expect(onToggle).toHaveBeenCalledOnce()
   })
 
   it.each([

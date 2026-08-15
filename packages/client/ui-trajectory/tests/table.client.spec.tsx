@@ -97,6 +97,49 @@ describe('TrajectoryTable', () => {
     expect(screen.getByText('20.0 tok/s')).toBeTruthy()
   })
 
+  it('shows the turn wall-clock span and running signal on the turn section label', () => {
+    const turns: readonly TrajectoryTurnModel[] = [{
+      turn: 1,
+      durationMs: 1_234,
+      groups: [{
+        title: 'Step 1',
+        cells: [{
+          index: 1,
+          kind: 'tool',
+          text: 'bash · {"command":"pwd"}',
+          inputDetail: '{"command":"pwd"}',
+          timeSeconds: 1.5,
+        }],
+      }],
+    }]
+    render(<TrajectoryTable turns={turns} {...FOLD_PROPS} />)
+    // The visual suffix and the section label's aria-name both carry the span;
+    // the in-flight tool (no output) marks the turn running.
+    expect(screen.getByText('· 1.2 s')).toBeTruthy()
+    expect(screen.getByLabelText('Turn 1 · 1.2 s · running')).toBeTruthy()
+  })
+
+  it('omits the running signal on a settled turn section label', () => {
+    const turns: readonly TrajectoryTurnModel[] = [{
+      turn: 1,
+      durationMs: 1_234,
+      groups: [{
+        title: 'Step 1',
+        cells: [{
+          index: 1,
+          kind: 'tool',
+          text: 'bash · {"command":"pwd"}',
+          inputDetail: '{"command":"pwd"}',
+          outputDetail: 'a.txt',
+          timeSeconds: 1.5,
+        }],
+      }],
+    }]
+    render(<TrajectoryTable turns={turns} {...FOLD_PROPS} />)
+    expect(screen.getByLabelText('Turn 1 · 1.2 s')).toBeTruthy()
+    expect(screen.queryByLabelText(/running/)).toBeNull()
+  })
+
   it('shows a tool record Duration as exact milliseconds', () => {
     const turns: readonly TrajectoryTurnModel[] = [{
       turn: 1,
@@ -780,7 +823,8 @@ describe('TrajectoryTable', () => {
 
   it('keeps a compact turn label available for narrow layouts', () => {
     render(<TrajectoryTable turns={TURNS} {...FOLD_PROPS} />)
-    const turnLabel = screen.getByLabelText('Turn 1')
+    // The fixture's in-flight tool marks the turn running in the label name.
+    const turnLabel = screen.getByLabelText('Turn 1 · running')
 
     expect(turnLabel.textContent).toContain('Turn 1')
     expect(turnLabel.textContent).toContain('#1')

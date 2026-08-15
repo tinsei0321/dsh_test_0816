@@ -410,10 +410,27 @@
 .turnLabelFull,
 .turnLabelCompact {
   grid-area: 1 / 1;
-  max-width: 64px;
+  /* Widened past the bare label so a turn wall-clock suffix survives. */
+  max-width: 96px;
   overflow: hidden;
   opacity: 1;
   white-space: nowrap;
+}
+
+/* Turn wall-clock suffix: same metrics, one step dimmer than the label. */
+.turnLabelDuration {
+  color: var(--dsw-alias-label-quaternary);
+}
+
+/* In-flight turn dot on the section label (Codex running-state signal). */
+.turnLabelDot {
+  grid-area: 1 / 2;
+  justify-self: end;
+  width: 5px;
+  height: 5px;
+  margin-left: 4px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-warn-primary);
 }
 
 .turnLabelCompact {

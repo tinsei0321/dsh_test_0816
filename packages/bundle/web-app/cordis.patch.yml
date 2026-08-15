@@ -84,11 +84,14 @@
     - id: session-stats
       name: '@deepseek-ai/dsh-session-stats'
 
-    # Resolve bind host, SSH launch, and display once at boot, then mount the
-    # matching dual-face directory picker. Mount -native or -browse directly in
-    # an overlay to pin the interaction.
+    # Pin the browse interaction directly: the web GUI's in-app workspace
+    # browser AND the project directory tree need the browse capability (a
+    # native OS dialog cannot list directory levels for remote/browser
+    # clients). Overlay -native + -auto back for a desktop dialog deployment.
     - id: directory-picker
-      name: '@deepseek-ai/dsh-host-directory-picker-auto'
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
+    - id: directory-picker-surface
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
 
     # Read-only projection of current Loader entries for trusted client RPCs.
     - id: plugin-inventory
@@ -215,9 +218,20 @@
     - id: ui-deliverables
       name: '@deepseek-ai/dsh-client-ui-deliverables'
 
+    # Details panel document half: the session's touched-file list plus the
+    # source reader over logged read/edit/search results. Remove this entry to
+    # turn the surface off; the details document tab renders empty.
+    - id: ui-document
+      name: '@deepseek-ai/dsh-client-ui-document'
 
     - id: ui-workspace
       name: '@deepseek-ai/dsh-client-ui-workspace'
+
+    # Sidebar project directory tree: the current workspace's file tree;
+    # file rows open the details panel's document tab. Remove this entry to
+    # turn the surface off; the project section renders empty.
+    - id: ui-project
+      name: '@deepseek-ai/dsh-client-ui-project'
 
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the two reference sources (ui-skill / ui-subagent).

@@ -94,7 +94,28 @@ export interface ToolRowModel {
   output: string | null
   /** First line of the result text on an error row; null for every other state. */
   errorSummary: string | null
+  /**
+   * Settled call's wall-clock duration in milliseconds (result time minus the
+   * paired call time); null while running or when the log carries no call time.
+   * Codex-style header fact: the row renders it as a trailing elapsed chip.
+   */
+  durationMs: number | null
   state: ToolRowState
+}
+
+/**
+ * Format a settled call's elapsed milliseconds as a compact Codex-style
+ * duration label (`42 ms`, `1.2 s`, `2m 05s`).
+ * @param ms - non-negative duration; null/negative yields null (nothing to show).
+ * @returns the display label, or null when the duration is absent.
+ */
+export function formatToolDuration(ms: number | null): string | null {
+  if (ms === null || !Number.isFinite(ms) || ms < 0) return null
+  if (ms < 1000) return `${Math.round(ms)} ms`
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)} s`
+  const minutes = Math.floor(ms / 60000)
+  const seconds = Math.round((ms % 60000) / 1000)
+  return `${minutes}m ${String(seconds).padStart(2, '0')}s`
 }
 
 /**
@@ -227,6 +248,11 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
   // would erase the collapsed error row's summary slot.
   const output = done ? (resultText(block) || null) : null
   const errorSummary = state === 'error' && output !== null ? firstLine(output) : null
+  // Wall-clock span of the settled call: result time minus its paired call
+  // time. callTime is null when the call record fell outside the event window.
+  const durationMs = done && block.callTime !== null
+    ? Math.max(0, block.time - block.callTime)
+    : null
   return {
     variant,
     title: toolTitle ?? VARIANT_TITLES[variant],
@@ -235,6 +261,7 @@ export function toolRowModel(toolName: string, block: ToolCallBlock, cwd?: strin
     body: deriveBody(variant, argsRaw),
     output,
     errorSummary,
+    durationMs,
     state,
   }
 }

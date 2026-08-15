@@ -25,6 +25,12 @@ import { FileMutationRow, fileMutationToolview } from '../src/client/tool/toolvi
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 
+/** Absent cross-panel open request for direct DetailsPanel hosts. */
+const absentDocRequest = bindSnapshotSelector({
+  getSnapshot: () => null as { path: string; token: number } | null,
+  subscribe: () => () => {},
+})
+
 afterEach(cleanup)
 
 /** FileMutationRow's full prop shape (ToolRow runtime share + conversation locale seat). */
@@ -117,7 +123,7 @@ describe('diffCardModel', () => {
 
 describe('chat row diff body', () => {
   const ownerProps = (block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName: 'edit', block, openFile: vi.fn(), t,
+    callId: 'c1', toolName: 'edit', block, openFile: vi.fn(), openDocument: vi.fn(), t,
   })
 
   it('the expanded body is the applied diff, capped tighter than the panel', () => {
@@ -141,7 +147,7 @@ describe('chat row diff body', () => {
     // A non-file tool name so the row is not single-file (no path link), and its
     // args body is the fallback the diff card must not have replaced.
     const view = render(<GenericToolCard {...{
-      callId: 'c1', toolName: 'some_tool', openFile: vi.fn(), t,
+      callId: 'c1', toolName: 'some_tool', openFile: vi.fn(), openDocument: vi.fn(), t,
       block: settled({
         call: { name: 'some_tool', argsRaw: '{"foo":"bar"}' },
         callView: null, resultView: null,
@@ -344,6 +350,9 @@ describe('DetailsPanel diff Output section', () => {
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
         closeDetails={vi.fn()}
+        openDocument={vi.fn()}
+        openDocumentPanel={vi.fn()}
+        useDocOpenRequest={absentDocRequest}
         t={t}
       />,
     )

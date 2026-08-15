@@ -28,7 +28,7 @@ import { CHAT_DIFF_MAX_LINES, type DiffCardModel } from '../models/diff-card-mod
 import { CHAT_READ_MAX_LINES, type ReadCardModel } from '../models/read-card-model.ts'
 import { CHAT_SEARCH_MAX_LINES, type SearchCardModel } from '../models/search-card-model.ts'
 import { terminalBlockLabels, type TerminalCardModel } from '../models/terminal-card-model.ts'
-import type { ToolRowState, ToolRowVariant } from '../models/tool-call-model.ts'
+import { formatToolDuration, type ToolRowState, type ToolRowVariant } from '../models/tool-call-model.ts'
 import css from './ToolRow.module.css'
 
 export interface ToolRowProps {
@@ -49,6 +49,11 @@ export interface ToolRowProps {
    * error row, whose collapsed summary is the failure line instead.
    */
   summarySuffix?: string | null | undefined
+  /**
+   * Settled call's elapsed milliseconds, rendered as a right-aligned muted
+   * chip (Codex exec-row duration). null/absent while running or unknown.
+   */
+  durationMs?: number | null | undefined
   /** Expanded-body input text; null = no input section. */
   body: string | null
   /** Flattened result text for the expanded Output section; null/absent = no output section. */
@@ -95,6 +100,11 @@ export interface ToolRowProps {
   /** Open the path with the host OS default application (already cwd-resolved). */
   onOpenFile?: ((path: string) => void) | undefined
   /**
+   * Open the path in the details panel's document tab instead of the host
+   * default app (Codex-style follow); when present it owns the path click.
+   */
+  onOpenDocument?: ((path: string) => void) | undefined
+  /**
    * Jump to this call in the trajectory view: a hover-revealed Inspect pill
    * over the expanded body. Absent = no affordance.
    */
@@ -133,6 +143,7 @@ export function ToolRow({
   title,
   summary,
   summarySuffix,
+  durationMs,
   body,
   output,
   errorSummary,
@@ -144,6 +155,7 @@ export function ToolRow({
   state,
   filePath,
   onOpenFile,
+  onOpenDocument,
   inspect,
 }: ToolRowProps) {
   const [expanded, setExpanded] = useState(false)
@@ -169,14 +181,21 @@ export function ToolRow({
   // The failure line replaces the summary wholesale, so a suffix derived from
   // the call args has nothing left to sit beside.
   const suffix = failureLine === null ? summarySuffix ?? null : null
+  // The settled call's elapsed chip: running rows carry the sweep instead (the
+  // live stopwatch belongs to the trajectory view), and an unknown call time
+  // (window falloff) has nothing to show.
+  const duration = state === 'running' ? null : formatToolDuration(durationMs ?? null)
   // The failure line is error prose, not the path: no open-file affordance.
-  const fileLink = filePath !== undefined && onOpenFile !== undefined && failureLine === null
+  // The document-tab opener (Codex-style follow) owns the click when present;
+  // the native host opener is the fallback.
+  const fileOpener = onOpenDocument ?? onOpenFile
+  const fileLink = filePath !== undefined && fileOpener !== undefined && failureLine === null
   const toggleExpand = () => {
     setExpanded(v => !v)
   }
   const openFile = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation()
-    if (filePath !== undefined) onOpenFile?.(filePath)
+    if (filePath !== undefined) fileOpener?.(filePath)
   }
   // Keep Enter/Space on the focused path link from bubbling to the row's
   // keydown handler, which would preventDefault() the key and toggle expand
@@ -228,6 +247,9 @@ export function ToolRow({
               </span>
             )}
             {suffix !== null && <span className={css.summarySuffix}>{suffix}</span>}
+            {duration !== null && (
+              <span className={css.duration} data-duration>{duration}</span>
+            )}
           </>
         )}
       >

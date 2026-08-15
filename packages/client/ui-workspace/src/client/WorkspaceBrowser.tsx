@@ -389,7 +389,10 @@ function SessionTree({
         aria-label={t('section.sessions')}
       >
         {groups.length === 0 && (
-          <div className={css.empty}>{t('empty.none')}</div>
+          <div className={css.empty}>
+            <div>{t('empty.none')}</div>
+            <div className={css.emptyHint}>{t('empty.newSessionHint')}</div>
+          </div>
         )}
         {groups.map((group) => {
           const workspaceId = group.workspaceId
@@ -618,7 +621,10 @@ function FlatList({
     <div className={clsx(css.treeBody, css.wide)}>
       <div className={clsx(css.list, css.flatList)} role="tree" aria-label={t('section.sessions')}>
         {rows.length === 0 && (
-          <div className={css.empty}>{t('empty.none')}</div>
+          <div className={css.empty}>
+            <div>{t('empty.none')}</div>
+            <div className={css.emptyHint}>{t('empty.newSessionHint')}</div>
+          </div>
         )}
         {rows.map((node) => {
           const active = drag !== null
@@ -816,6 +822,21 @@ export function WorkspaceBrowser({
     if (!wide || !searchExpanded || searchOnExpand) return
     searchInput.current?.focus({ preventScroll: true })
   }, [wide, searchExpanded, searchOnExpand])
+
+  // Cmd/Ctrl+G focuses session search (Codex's search shortcut): expand the
+  // sidebar if it is collapsed, then land in the search box.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return
+      if (e.key !== 'g' && e.key !== 'G') return
+      e.preventDefault()
+      setSearchExpanded(true)
+      setSearchOnExpand(true)
+      expandSidebar()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('keydown', onKeyDown) }
+  }, [expandSidebar])
 
   useEffect(() => {
     if (!wide || !searchExpanded) return

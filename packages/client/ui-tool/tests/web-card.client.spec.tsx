@@ -31,6 +31,12 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 
+/** Absent cross-panel open request for direct DetailsPanel hosts. */
+const absentDocRequest = bindSnapshotSelector({
+  getSnapshot: () => null as { path: string; token: number } | null,
+  subscribe: () => () => {},
+})
+
 afterEach(cleanup)
 
 const SID = 's1' as SessionId
@@ -127,7 +133,7 @@ describe('webCardModel', () => {
 
 describe('chat row web body', () => {
   const ownerProps = (block: RunningToolCall | ToolResultNode, toolName: string): ToolCallOwnerProps => ({
-    callId: block.callId, toolName, block, openFile: vi.fn(),
+    callId: block.callId, toolName, block, openFile: vi.fn(), openDocument: vi.fn(),
   })
   // WebRow reads only toolName/block off the full runtime share plus the locale
   // seat; the standard kit is unused, so the cast supplies the owner slice and
@@ -239,6 +245,9 @@ describe('DetailsPanel web Output section', () => {
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
         closeDetails={vi.fn()}
+        openDocument={vi.fn()}
+        openDocumentPanel={vi.fn()}
+        useDocOpenRequest={absentDocRequest}
         t={t}
       />,
     )

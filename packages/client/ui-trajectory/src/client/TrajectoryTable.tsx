@@ -19,7 +19,7 @@ import type {
 import type {
   AssistantMetricDetail, TrajectoryCellKind, TrajectoryCellProps, TrajectorySourceBlock,
 } from './trajectory-record.ts'
-import { formatElapsedSeconds, trajectoryRecordId } from './trajectory-record.ts'
+import { formatCompactDurationMs, formatElapsedSeconds, trajectoryRecordId } from './trajectory-record.ts'
 import {
   groupTrajectoryVirtualRows, trajectoryVirtualRecordKey,
 } from './trajectory-virtual-rows.ts'
@@ -512,6 +512,21 @@ function indexRequestBoundaries(records: readonly TableRecord[]): ReadonlyMap<st
 
 function sectionLabel(turn: number | null): string {
   return turn === null ? 'Between turns' : `Turn ${turn}`
+}
+
+/** Turn-section label suffix (` · 1.2 s`) for a computed wall-clock span; null without one. */
+function turnDurationText(turn: number, durations: ReadonlyMap<number, number>): string | null {
+  const duration = durations.get(turn)
+  return duration === undefined ? null : formatCompactDurationMs(duration)
+}
+
+/** Turns containing at least one in-flight record (progress visibility on the section label). */
+function runningTurnSet(records: readonly TableRecord[]): ReadonlySet<number> {
+  const running = new Set<number>()
+  for (const record of records) {
+    if (record.turn !== null && stateOf(record) === 'running') running.add(record.turn)
+  }
+  return running
 }
 
 function indexRequestNumbers(
@@ -1733,6 +1748,18 @@ export function TrajectoryTable({
   const [olderLoading, setOlderLoading] = useState(false)
   const olderLoadAnchor = useRef<OlderLoadAnchor | null>(null)
   const allRecords = useMemo(() => flattenRecords(turns), [turns])
+  // Turn wall-clock spans (computed by the layout fold) keyed for the section labels.
+  const turnDurationByTurn = useMemo(() => {
+    const durations = new Map<number, number>()
+    for (const turn of turns) {
+      if (turn.turn !== null && turn.durationMs !== null && turn.durationMs !== undefined) {
+        durations.set(turn.turn, turn.durationMs)
+      }
+    }
+    return durations
+  }, [turns])
+  // Turns with at least one in-flight record: the section label signals them.
+  const runningTurns = useMemo(() => runningTurnSet(allRecords), [allRecords])
   const streamingCellsByIndex = useMemo(
     () => new Map(streamingCells.map(cell => [cell.index, cell])),
     [streamingCells],
@@ -2412,25 +2439,42 @@ export function TrajectoryTable({
                         {!isCollapsedSummary
                     && !isRequestOnly
                     && record.turnStart && (
-                          <span
-                            className={sectionActive
-                              ? `${css.turnLabel} ${css.turnLabelActive}`
-                              : css.turnLabel}
-                            aria-label={sectionLabel(record.turn)}
-                          >
-                            {record.turn === null
-                              ? sectionLabel(record.turn)
-                              : (
-                                <>
-                                  <span className={css.turnLabelFull} aria-hidden="true">
-                                    {sectionLabel(record.turn)}
-                                  </span>
-                                  <span className={css.turnLabelCompact} aria-hidden="true">
-                                    #{record.turn}
-                                  </span>
-                                </>
-                              )}
-                          </span>
+                          (() => {
+                            const durationText = record.turn === null
+                              ? null
+                              : turnDurationText(record.turn, turnDurationByTurn)
+                            const turnRunning = record.turn !== null && runningTurns.has(record.turn)
+                            const labelParts = [sectionLabel(record.turn)]
+                            if (durationText !== null) labelParts.push(durationText)
+                            if (turnRunning) labelParts.push('running')
+                            const label = labelParts.join(' · ')
+                            return (
+                              <span
+                                className={sectionActive
+                                  ? `${css.turnLabel} ${css.turnLabelActive}`
+                                  : css.turnLabel}
+                                aria-label={label}
+                                data-running={turnRunning || undefined}
+                              >
+                                {record.turn === null
+                                  ? sectionLabel(record.turn)
+                                  : (
+                                    <>
+                                      <span className={css.turnLabelFull} aria-hidden="true">
+                                        {sectionLabel(record.turn)}
+                                        {durationText !== null && (
+                                          <span className={css.turnLabelDuration}>{` · ${durationText}`}</span>
+                                        )}
+                                      </span>
+                                      <span className={css.turnLabelCompact} aria-hidden="true">
+                                        #{record.turn}
+                                      </span>
+                                      {turnRunning && <span className={css.turnLabelDot} aria-hidden="true" />}
+                                    </>
+                                  )}
+                              </span>
+                            )
+                          })()
                         )}
                         <div className={css.eventInner}>
                           {!isCollapsedSummary && !isRequestOnly && (

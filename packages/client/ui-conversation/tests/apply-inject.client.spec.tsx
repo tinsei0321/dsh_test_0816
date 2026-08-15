@@ -57,7 +57,7 @@ async function bench() {
     summary: { title: 'R', displayTitle: 'R', cwd: '/proj' },
     session: sessionFake,
   })
-  const layoutFake = { openDetails: vi.fn(), closeDetails: vi.fn() }
+  const layoutFake = { openDetails: vi.fn(), expandDetails: vi.fn(), closeDetails: vi.fn() }
   runtime.provide('layout', layoutFake)
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.provide('locale', locale)
@@ -336,13 +336,27 @@ describe('conversation slot inject API', () => {
 })
 
 describe('details inject API', () => {
-  it('details injects the one layout callback; selection rides the shared store instead', async () => {
+  it('details injects the layout/store callbacks and the open-request hook; selection rides the shared store instead', async () => {
     const b = await bench()
     const entry = b.entryOf('details')
-    const injected = (entry.inject as unknown as () => DetailsInjected)()
-    expect(Object.keys(injected)).toEqual(['closeDetails'])
+    const instance = b.runtime.storeOf('details', ROOT) as ChatInstance
+    const injected = (entry.inject as unknown as (sessionId: SessionId, actions: ChatActions) => DetailsInjected)(
+      ROOT, instance.actions)
+    expect(Object.keys(injected)).toEqual(['closeDetails', 'openDocument', 'openDocumentPanel', 'hooks'])
     injected.closeDetails()
     expect(b.layoutFake.closeDetails).toHaveBeenCalledTimes(1)
+    // The document write path widens the column and pins the path in the store.
+    injected.openDocument('notes/a.txt')
+    expect(b.layoutFake.expandDetails).toHaveBeenCalledTimes(1)
+    expect(instance.store.getSnapshot().openDocs).toEqual(['notes/a.txt'])
+    expect(instance.store.getSnapshot().detailsTab).toBe('document')
+    // The panel-only path opens the document tab without a pin.
+    injected.openDocumentPanel()
+    expect(b.layoutFake.openDetails).toHaveBeenCalledTimes(1)
+    expect(instance.store.getSnapshot().activeDoc).toBe('notes/a.txt')
+    expect(instance.store.getSnapshot().detailsTab).toBe('document')
+    // The hook compartment carries the published cross-panel request source.
+    expect(injected.hooks.docOpenRequest.getSnapshot()).toBeNull()
     // The shared handle: details resolves the SAME instance conversation writes.
     const conv = b.runtime.storeOf('conversation.session', ROOT)
     const details = b.runtime.storeOf('details', ROOT)

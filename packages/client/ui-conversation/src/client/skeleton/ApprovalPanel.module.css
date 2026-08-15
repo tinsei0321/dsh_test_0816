@@ -49,6 +49,18 @@
   background: var(--dsw-alias-state-warn-primary);
 }
 
+/* Answered-in-flight state: the decision is submitted and the buttons are
+   already disabled; the strip mutes to signal the wait is no longer actionable
+   without losing the approval card's identity. */
+.strip[data-answered] {
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.strip[data-answered] .dot {
+  background: var(--dsw-alias-label-quaternary);
+}
+
 /* Scroll region: an agent's justification and its command are unbounded model
    text (a one-line `cd` or a 40-line heredoc), and the seat sits in a
    fixed-height column — uncapped, a long command pushed the action row past

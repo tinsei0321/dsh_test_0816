@@ -6,7 +6,7 @@ import type { RunningToolCall, ToolResultNode } from '@deepseek-ai/dsh-client-ru
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { resolveWorkspacePath } from '@deepseek-ai/dsh-client-runtime/client'
-import { classifyTool, resultText, toolRowModel } from '../src/client/tool/models/tool-call-model.ts'
+import { classifyTool, formatToolDuration, resultText, toolRowModel } from '../src/client/tool/models/tool-call-model.ts'
 import { ToolRow } from '../src/client/tool/components/ToolRow.tsx'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
@@ -89,6 +89,23 @@ describe('tool-call-model', () => {
     expect(toolRowModel('bash', result()).state).toBe('ok')
     expect(toolRowModel('bash', result({ isError: true })).state).toBe('error')
     expect(toolRowModel('bash', result({ isError: true, error: { name: 'E', code: 'interrupted' } })).state).toBe('stopped')
+  })
+
+  it('derives the settled wall-clock duration and leaves running calls without one', () => {
+    expect(toolRowModel('bash', running()).durationMs).toBeNull()
+    expect(toolRowModel('bash', result()).durationMs).toBe(1_000)
+    // A result timestamp older than its call time clamps to zero, never negative.
+    expect(toolRowModel('bash', result({ time: 1_500, callTime: 2_000 })).durationMs).toBe(0)
+    expect(toolRowModel('bash', result({ callTime: null })).durationMs).toBeNull()
+  })
+
+  it('formats durations compactly for the row chip', () => {
+    expect(formatToolDuration(null)).toBeNull()
+    expect(formatToolDuration(-1)).toBeNull()
+    expect(formatToolDuration(Number.NaN)).toBeNull()
+    expect(formatToolDuration(42)).toBe('42 ms')
+    expect(formatToolDuration(1_234)).toBe('1.2 s')
+    expect(formatToolDuration(65_000)).toBe('1m 05s')
   })
 
   it('derives the bash summary from description over command', () => {
@@ -306,6 +323,17 @@ describe('ToolRow', () => {
     expect(view.getByText('List files')).toBeTruthy()
   })
 
+  it('settled rows show the elapsed chip; running rows keep it hidden', () => {
+    const settled = render(<ToolRow {...rowProps} durationMs={1_234} />)
+    expect(settled.getByText('1.2 s')).toBeTruthy()
+    settled.unmount()
+    const running = render(<ToolRow {...rowProps} durationMs={1_234} state="running" />)
+    expect(running.queryByText('1.2 s')).toBeNull()
+    running.unmount()
+    const unknown = render(<ToolRow {...rowProps} state="ok" />)
+    expect(unknown.container.querySelector('[data-duration]')).toBeNull()
+  })
+
   it('renders summarySuffix outside the ellipsized summary span, and drops it on a failure line', () => {
     const view = render(<ToolRow {...rowProps} summarySuffix="+2" />)
     const summary = view.getByText('List files')
@@ -376,7 +404,7 @@ describe('ToolRow', () => {
 
 describe('GenericToolCard', () => {
   const props = (toolName: string, block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName, block, openFile: vi.fn(), t,
+    callId: 'c1', toolName, block, openFile: vi.fn(), openDocument: vi.fn(), t,
   })
 
   it('renders the classified variant row from the frozen slice', () => {
@@ -429,15 +457,19 @@ describe('GenericToolCard', () => {
     expect(inspect).toHaveBeenCalledTimes(1)
   })
 
-  it('file-path summary click reaches openFile; bash summary does not', () => {
+  it('file-path summary click follows into the document panel; bash summary does not', () => {
     const file = props('read', running({ name: 'read', argsRaw: '{"path":"src/x.ts"}' }))
     const fileView = render(<GenericToolCard {...file} />)
     fireEvent.click(fileView.getByText('src/x.ts'))
-    expect(file.openFile).toHaveBeenCalledWith('src/x.ts')
+    // The document-tab opener owns the path click (Codex follow); the host
+    // opener is only the fallback when no document opener is wired.
+    expect(file.openDocument).toHaveBeenCalledWith('src/x.ts')
+    expect(file.openFile).not.toHaveBeenCalled()
 
     const bash = props('bash', result())
     const bashView = render(<GenericToolCard {...bash} />)
     fireEvent.click(bashView.getByText('List files'))
     expect(bash.openFile).not.toHaveBeenCalled()
+    expect(bash.openDocument).not.toHaveBeenCalled()
   })
 })

@@ -128,14 +128,14 @@ describe('keyed toolview hole through the real machinery', () => {
     await b.runtime.dispose()
   })
 
-  it('file-path clicks travel owner openFile → chat inject → workspaces.openPath', async () => {
+  it('file-path clicks open the file in the document panel (Codex follow) instead of the host app', async () => {
     const b = await bench([toolResult(3, 'c1', 'read', '{"path":"src/a.ts"}')])
+    const documentOpen = b.runtime.ctx.get('documentOpen') as { open: (path: string) => void }
+    const open = vi.spyOn(documentOpen, 'open')
     const view = b.runtime.renderRoot()
     view.getByText('src/a.ts').click()
-    expect(b.layout.openDetails).not.toHaveBeenCalled()
-    await vi.waitFor(() => {
-      expect(b.runtime.workspaces.calls).toContainEqual({ method: 'openPath', args: ['src/a.ts'] })
-    })
+    expect(open).toHaveBeenCalledWith('src/a.ts')
+    expect(b.runtime.workspaces.calls.some(c => c.method === 'openPath')).toBe(false)
     await b.runtime.dispose()
   })
 

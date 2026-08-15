@@ -31,6 +31,28 @@ export const inject = ['slots', 'layout', 'sessions', 'workspaces', 'locale']
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-sidebar: dictionaries')
 
+  // Codex session-switch shortcuts: Cmd/Ctrl+Shift+[ / ] move through the
+  // listed sessions in list order. No current selection = nothing to switch.
+  ctx.effect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey) return
+      if (e.key !== '[' && e.key !== ']') return
+      const { ids, current } = ctx.sessions.list.getSnapshot()
+      if (ids.length === 0 || current === undefined) return
+      const index = ids.indexOf(current)
+      if (index === -1) return
+      const delta = e.key === ']' ? 1 : -1
+      // Non-empty ids make the modulo index in range; the undefined check only
+      // narrows the element access for the typechecker.
+      const target = ids[(index + delta + ids.length) % ids.length]
+      if (target === undefined) return
+      e.preventDefault()
+      ctx.sessions.open(target)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('keydown', onKeyDown) }
+  }, 'ui-sidebar: session-switch shortcuts')
+
   const injectProps = (): SidebarRootInjected => ({
     // The shell's New Session button rides the runtime's shared action
     // (current Session Workspace, then recent Workspace).

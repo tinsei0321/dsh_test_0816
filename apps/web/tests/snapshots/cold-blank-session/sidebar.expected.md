@@ -1,1 +1,1 @@
-- tree "Sessions": No sessions yet
+- tree "Sessions": No sessions yet Start a new conversation with the New Session button above.

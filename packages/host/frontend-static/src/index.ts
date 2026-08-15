@@ -68,7 +68,10 @@ export async function serveStatic(
   }
   const serveIndex = async (): Promise<void> => {
     const body = await renderIndex()
-    res.writeHead(200, { 'content-type': MIME['.html'] })
+    // The boot manifest (bundle rev list) lives in this body and changes every
+    // build, so the index must never be served from a heuristic cache: a stale
+    // copy pins old bundle revs and the client keeps loading old plugins.
+    res.writeHead(200, { 'content-type': MIME['.html'], 'cache-control': 'no-store' })
     res.end(body)
   }
   if (target === distRoot || target === distIndex) {

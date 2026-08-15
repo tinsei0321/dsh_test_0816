@@ -113,4 +113,17 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(declarations('.rail .iconButton')?.get('width')).toBe('36px')
     expect(declarations('.rail .search')?.get('width')).toBe('36px')
   })
+
+  it('keeps the Project hierarchy: session indent, count, and focus rings', () => {
+    expect(rowDeclarations('.sessionRow')?.get('padding-left')).toBe('22px')
+    expect(rowDeclarations('.flatSessionRow')?.get('padding-left')).toBe('8px')
+    expect(rowDeclarations('.projectCount')?.get('color')).toBe('var(--dsw-alias-label-tertiary)')
+    expect(rowDeclarations('.projectRow.current .title')?.get('font-weight')).toBe('500')
+    expect(rowDeclarations('.projectRow:focus-visible')?.get('box-shadow'))
+      .toBe('inset 0 0 0 2px var(--dsw-alias-border-l3)')
+    expect(rowDeclarations('.sessionRow:active')?.get('background'))
+      .toBe('var(--dsw-alias-interactive-bg-active)')
+    expect(declarations('.sessionOverflowButton')?.get('padding')).toBe('0 12px 0 42px')
+    expect(declarations('.emptyHint')?.get('margin-top')).toBe('2px')
+  })
 })

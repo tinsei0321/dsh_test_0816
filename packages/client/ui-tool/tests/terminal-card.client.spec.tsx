@@ -25,6 +25,12 @@ import { BashRow } from '../src/client/tool/toolviews/bash-sample.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
 import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 
+/** Absent cross-panel open request for direct DetailsPanel hosts. */
+const absentDocRequest = bindSnapshotSelector({
+  getSnapshot: () => null as { path: string; token: number } | null,
+  subscribe: () => () => {},
+})
+
 type BashRowProps = Parameters<typeof BashRow>[0]
 
 // Mirrors the real lookup chain (conversation namespace, then common).
@@ -242,7 +248,7 @@ describe('terminalCardModel', () => {
 
 describe('chat row terminal body', () => {
   const ownerProps = (block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName: 'bash', block, openFile: vi.fn(), t,
+    callId: 'c1', toolName: 'bash', block, openFile: vi.fn(), openDocument: vi.fn(), t,
   })
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -475,6 +481,9 @@ describe('DetailsPanel Output section', () => {
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
         closeDetails={vi.fn()}
+        openDocument={vi.fn()}
+        openDocumentPanel={vi.fn()}
+        useDocOpenRequest={absentDocRequest}
         t={t}
       />,
     )
@@ -661,6 +670,9 @@ describe('DetailsPanel Output section', () => {
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
         closeDetails={closeDetails}
+        openDocument={vi.fn()}
+        openDocumentPanel={vi.fn()}
+        useDocOpenRequest={absentDocRequest}
         t={t}
       />,
     )

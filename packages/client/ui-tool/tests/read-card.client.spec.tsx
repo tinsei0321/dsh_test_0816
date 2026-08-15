@@ -28,6 +28,12 @@ import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-conversation/src/client
 import { ReadRow, readToolview } from '../src/client/tool/toolviews/read-row.tsx'
 import { renderToolDetails, SessionProviderStub, toolChatSnapshot } from './tool-details-render.client.tsx'
 
+/** Absent cross-panel open request for direct DetailsPanel hosts. */
+const absentDocRequest = bindSnapshotSelector({
+  getSnapshot: () => null as { path: string; token: number } | null,
+  subscribe: () => () => {},
+})
+
 afterEach(cleanup)
 
 const SID = 's1' as SessionId
@@ -129,7 +135,7 @@ describe('readCardModel', () => {
 
 describe('GenericToolCard read body', () => {
   const ownerProps = (block: RunningToolCall | ToolResultNode): GenericToolCardProps => ({
-    callId: 'c1', toolName: 'web_fetch', block, openFile: vi.fn(), t,
+    callId: 'c1', toolName: 'web_fetch', block, openFile: vi.fn(), openDocument: vi.fn(), t,
   })
 
   /** The whole summary row is the expand toggle (ToolRow's unified interaction). */
@@ -155,7 +161,7 @@ describe('GenericToolCard read body', () => {
     const view = render(<GenericToolCard {...({
       callId: 'c1', toolName: 'echo', block: settled({
         call: { name: 'echo', argsRaw: '{"text":"x"}' }, callView: null, resultView: null,
-      }), openFile: vi.fn(), t,
+      }), openFile: vi.fn(), openDocument: vi.fn(), t,
     })} />)
     toggleRow(view)
     expect(view.container.querySelector('[data-read]')).toBeNull()
@@ -291,6 +297,9 @@ describe('DetailsPanel Output section (read)', () => {
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
         closeDetails={vi.fn()}
+        openDocument={vi.fn()}
+        openDocumentPanel={vi.fn()}
+        useDocOpenRequest={absentDocRequest}
       />,
     )
   }

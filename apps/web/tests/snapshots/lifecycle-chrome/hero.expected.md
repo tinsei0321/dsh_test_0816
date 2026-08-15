@@ -13,9 +13,9 @@
 - button "Add workspace":
   - img
 - tree "Sessions":
-  - treeitem "workspace" [expanded]:
+  - treeitem "workspace 1 session" [expanded]:
     - img
-    - text: workspace
+    - text: workspace 1 session
   - treeitem "New Session" [selected]
 - button "Settings":
   - img
@@ -40,4 +40,19 @@
 - button "Send message" [disabled]
 - text: Details
 - button "Close details"
-- text: Click a tool row in the message flow to view its details
+- tablist "Details":
+  - tab "Tool details" [selected]
+  - tab "Documents"
+- tabpanel: Click a tool row in the message flow to view its details
+- region "Project directory tree of the current workspace":
+  - text: Project files
+  - button "Show hidden files"
+  - button "Collapse file panel":
+    - img
+  - tree:
+    - 'treeitem "workspace: Collapse" [expanded]':
+      - 'button "workspace: Collapse"':
+        - img
+        - img
+        - text: workspace
+      - group

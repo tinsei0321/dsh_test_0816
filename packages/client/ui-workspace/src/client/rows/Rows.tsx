@@ -15,7 +15,7 @@ import {
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { GroupNode, SearchResultNode, SessionNode } from '../tree.ts'
-import { relativeTime } from '../tree.ts'
+import { sessionTimeBucket, type SessionTimeBucket } from '../tree.ts'
 import css from './Rows.module.css'
 
 /** The standard locale seat, prop-passed from the browser root. */
@@ -26,16 +26,34 @@ function displayTitle(node: SessionNode, t: RowTranslate): string {
   return node.blank ? t('session.new') : node.title
 }
 
-/** Localized compact relative time ("刚刚"/"5分钟" in zh, "now"/"5min" in en). */
-function timeLabel(updatedAt: number, now: number, t: RowTranslate): string {
-  const { unit, n } = relativeTime(updatedAt, now)
-  return unit === 'now' ? t('time.now') : t(`time.${unit}`, { n })
+/** Zero-pad one date/time component to two digits. */
+function pad2(value: number): string {
+  return String(value).padStart(2, '0')
 }
 
-/** Hover-card variant: distances wrap in the ago template; the now bucket stays bare (no "now ago"). */
-function hoverTimeLabel(updatedAt: number, now: number, t: RowTranslate): string {
-  const { unit, n } = relativeTime(updatedAt, now)
-  return unit === 'now' ? t('time.now') : t('time.ago', { t: t(`time.${unit}`, { n }) })
+/**
+ * Row and hover-card time label over the calendar-aware bucket ladder:
+ * relative distances carry the ago template, the previous calendar day pins
+ * its clock time, and older timestamps fall back to plain dates.
+ */
+function timeLabel(bucket: SessionTimeBucket, t: RowTranslate): string {
+  switch (bucket.unit) {
+    case 'now': return t('time.now')
+    case 'minutes': return t('time.ago', { t: t('time.minutes', { n: bucket.n }) })
+    case 'hours': return t('time.ago', { t: t('time.hours', { n: bucket.n }) })
+    case 'yesterday': return t('time.yesterday', { time: `${pad2(bucket.hour)}:${pad2(bucket.minute)}` })
+    case 'date': return t('date.md', { m: pad2(bucket.month), d: pad2(bucket.day) })
+    case 'dateFull': return t('date.yyyymmdd', {
+      y: bucket.year, m: pad2(bucket.month), d: pad2(bucket.day),
+    })
+    /* v8 ignore next -- closed SessionTimeBucket union */
+    default: return assertNever(bucket)
+  }
+}
+
+/** Localized row time: bucket the distance once and share the label with the hover card. */
+function activityTimeLabel(updatedAt: number, now: number, t: RowTranslate): string {
+  return timeLabel(sessionTimeBucket(updatedAt, now), t)
 }
 
 /**
@@ -120,7 +138,8 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
   const row = group
   // The ungrouped bucket has no workspace title: its label is dictionary copy.
   const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
-  const active = group.expanded && group.containsCurrent
+  // The current-workspace highlight follows the selection regardless of fold.
+  const current = group.containsCurrent
   const [menuOpen, setMenuOpen] = useState(false)
   const workspaceMenuItems = [
     { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
@@ -128,10 +147,16 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
   ]
   const ownRow = (
     <div
-      className={clsx(css.projectRow, menuOpen && css.menuOpen)}
+      className={clsx(css.projectRow, current && css.current, menuOpen && css.menuOpen)}
       role="treeitem"
       aria-expanded={row.expanded}
+      tabIndex={0}
       onClick={onToggle}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        onToggle()
+      }}
       draggable={drag !== undefined}
       onDragStart={drag === undefined
         ? undefined
@@ -142,7 +167,7 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
         }}
       onDragEnd={drag?.end}
     >
-      <span className={clsx(css.slot, css.folder, active && css.folderActive)}>
+      <span className={clsx(css.slot, css.folder, current && css.folderActive)}>
         {row.expanded ? <IconFolderOpen16 /> : <IconFolderClose16 />}
       </span>
       <span className={clsx(css.slot, css.chevron)}>
@@ -150,6 +175,11 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, t }: 
       </span>
       <span className={css.projectText}>
         <span className={css.title}>{label}</span>
+      </span>
+      <span className={css.projectCount}>
+        {row.sessionCount === 1
+          ? t('sessions.count.one', { n: row.sessionCount })
+          : t('sessions.count.other', { n: row.sessionCount })}
       </span>
       <span className={css.rowActions}>
         {actions !== undefined && (
@@ -271,7 +301,7 @@ function SessionStatusDots({ statuses }: { statuses: readonly [SessionStatus, ..
   )
 }
 
-/** Hover-card body: full title, relative time, and every relevant live status. */
+/** Hover-card body: full title, activity time, and every relevant live status. */
 function SessionHoverContent({ node, now, t }: { node: SessionNode; now: number; t: RowTranslate }) {
   const statuses = sessionStatuses(node, t)
   return (
@@ -279,7 +309,7 @@ function SessionHoverContent({ node, now, t }: { node: SessionNode; now: number;
       <div className={css.hoverTitle}>{displayTitle(node, t)}</div>
       {/* Same placeholder rule as the row's trailing cell: no timestamp
           before the first prompt. */}
-      {!node.blank && <div className={css.hoverTime}>{hoverTimeLabel(node.updatedAt, now, t)}</div>}
+      {!node.blank && <div className={css.hoverTime}>{activityTimeLabel(node.updatedAt, now, t)}</div>}
       {statuses.map(status => (
         <div className={css.hoverStatus} key={status.label}>
           <StateDot state={status.state} />
@@ -337,10 +367,11 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
 
 /**
  * One top-level 34px session row: status dot (pending user interaction outranks
- * own or descendant activity), title, relative time, and the row actions menu.
+ * own or descendant activity), title, the calendar-aware activity time, and
+ * the row actions menu.
  * @param props.node - derived session node.
  * @param props.currentId - selected session id (row highlight).
- * @param props.now - epoch ms for relative-time formatting.
+ * @param props.now - epoch ms for time formatting.
  * @param props.onOpen - open a session by id.
  * @param props.onRename - open the session rename dialog (id + current title).
  * @param props.onFork - fork a session at its last completed turn.
@@ -388,12 +419,19 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
     <div
       className={clsx(
         css.sessionRow, selected && css.selected, menuOpen && css.menuOpen,
+        flat && css.flatSessionRow,
         flat && !showStatus && css.flatSessionRowWithoutStatus,
         drag?.marker === 'before' && css.dropBefore, drag?.marker === 'after' && css.dropAfter,
       )}
       role="treeitem"
       aria-selected={selected}
+      tabIndex={0}
       onClick={() => { onOpen(node.id) }}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        onOpen(node.id)
+      }}
       draggable={drag !== undefined}
       onDragStart={drag === undefined
         ? undefined
@@ -432,7 +470,7 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
           happened in it yet, so a "now" timestamp and the row verbs
           (rename/fork/archive) would all act on content that does not
           exist — both trailing cells stay off until the first prompt. */}
-      {!row.blank && <span className={css.time}>{timeLabel(row.updatedAt, now, t)}</span>}
+      {!row.blank && <span className={css.time}>{activityTimeLabel(row.updatedAt, now, t)}</span>}
       {!row.blank && (
         <span className={css.rowActions}>
           <Menu

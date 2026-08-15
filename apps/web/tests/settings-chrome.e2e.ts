@@ -216,7 +216,9 @@ describe('web e2e: settings modal and General preferences', () => {
       })
       expect(state).toEqual({
         attr: true,
-        background: 'rgb(21, 21, 23)',
+        // The boot page paints --dsw-alias-bg-base, which the shipped Codex
+        // theme remaps to its charcoal (codex-theme.css).
+        background: 'rgb(14, 15, 18)',
         colorScheme: 'dark',
       })
     } finally {

@@ -123,6 +123,17 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'conversation.details.tool': { kind: 'single'; scope: 'session'; owner: DetailsToolOwnerProps }
     /**
+     * The body of the details panel's document half — one occupant, so taking
+     * it means rendering the whole document surface: the session's touched-file
+     * list, the open-file tab strip, and the reader for the focused tab. The
+     * owner passes the open tabs (`docs`), the focused path (`doc`, null when
+     * none), and the two write paths (`onOpen`/`onClose`) through which the
+     * occupant changes them — the render site owns the store. Treat `cwd` as
+     * display-only, for shortening workspace-rooted paths. Rendered only while
+     * the details panel's document tab is active.
+     */
+    'conversation.details.document': { kind: 'single'; scope: 'session'; owner: DetailsDocumentOwnerProps }
+    /**
      * The composer takeover chain: entries are selector-routed replacements
      * of the default InputBar. Declared by this package's 'conversation'
      * entry; the owner dispatches the {@link ComposerChainProps} currency and
@@ -310,7 +321,36 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Prose file-mention provider (ui-deliverables); reach via ctx.get — optional. */
     chatFileMentions: ChatFileMentions
+    /**
+     * Cross-panel document opener (ui-conversation): any browser plugin opens
+     * a file in the details panel's document tab through this service; reach
+     * via ctx.get — the provider is this package's own entry.
+     */
+    documentOpen: DocumentOpen
   }
+}
+
+/**
+ * The cross-panel document-opener service: publishing plugins hand a file
+ * path to the details panel's document tab, or open the tab itself. The
+ * consumer side is the details entry's inject hooks compartment (see
+ * {@link DetailsInjected}).
+ */
+export interface DocumentOpen {
+  /** Open the file in the details panel's document tab (opens the column too). */
+  open(path: string): void
+  /** Open the details column on the document tab without pinning a file. */
+  openPanel(): void
+}
+
+/**
+ * One published open request, consumed by the current session's details
+ * panel. `token` forces a fresh frame even for the same path twice; a null
+ * path is a panel-only open (the document tab without a pinned file).
+ */
+export interface DocumentOpenRequest {
+  path: string | null
+  token: number
 }
 
 /**
@@ -328,6 +368,11 @@ export interface TurnTailOwnerProps {
    * view resolves relative paths against the session cwd).
    */
   openFile: (path: string) => void
+  /**
+   * Open the path in the details panel's document tab (Codex-style follow);
+   * the same cross-panel gesture the tool rows expose.
+   */
+  openDocument: (path: string) => void
 }
 
 /**
@@ -359,6 +404,8 @@ export interface ChatNodeOwnerProps {
   /** Session workspace root; Tool summaries display paths relative to it. */
   cwd?: string | undefined
   openFile: (path: string) => void
+  /** Open the path in the details panel's document tab (Codex-style follow). */
+  openDocument: (path: string) => void
   inspectCall: (callId: CallId) => void
   forkAt: (seq: number) => void
   /** Resolve a session-authorized historical image for inline display. */
@@ -375,6 +422,24 @@ export interface DetailsToolOwnerProps {
   /** Frozen selected call slice. */
   block: ToolCallBlock
   /** Session workspace root for card cwd and relative-path display. */
+  cwd?: string | undefined
+}
+
+/** Owner currency of the details panel's document renderer. */
+export interface DetailsDocumentOwnerProps {
+  /** The open file tabs, in open order (first = oldest). */
+  docs: readonly string[]
+  /** The focused tab, or null when none is open. */
+  doc: string | null
+  /**
+   * Open a file (append a tab and focus it, or refocus an existing one); the
+   * render site owns the store, so this also flips the panel to the document
+   * tab.
+   */
+  onOpen: (path: string) => void
+  /** Close one tab; the render site owns the store. */
+  onClose: (path: string) => void
+  /** Session workspace root for relative-path display. */
   cwd?: string | undefined
 }
 
@@ -699,6 +764,12 @@ export interface ChatViewInjected {
   /** Fork through the completed turn ending at the eligible message `seq`, then open the child. */
   forkAt: (seq: number) => void
   /**
+   * Publish a cross-panel open: opens the details column and pins the path in
+   * the document tab (the chat view's half of the {@link DocumentOpen} service
+   * surface — tool rows and file links reach the same gesture).
+   */
+  openDocument: (path: string) => void
+  /**
    * Prose file-mention vocabulary for one closing message, from the optional
    * {@link ChatFileMentions} service (resolved lazily per call, so composing
    * the provider in or out takes effect live). Undefined when the service is
@@ -714,16 +785,29 @@ export type ChatViewSlotProps =
 
 /**
  * Injected share of the details slot: the panel is otherwise a pure reader of
- * the shared chat store, but its close button is a layout orchestration call.
+ * the shared chat store, but its close button and the cross-panel document
+ * open are layout/store orchestration calls.
  */
 export interface DetailsInjected {
   /** Close the details panel (layout geometry stays with ctx.layout). */
   closeDetails: () => void
+  /**
+   * Open the details column and pin the path in the document tab — the
+   * details panel's own write path, invoked from the {@link DocumentOpen}
+   * request hook below.
+   */
+  openDocument: (path: string) => void
+  /** Open the details column on the document tab without pinning a file. */
+  openDocumentPanel: () => void
+  hooks: {
+    /** Published cross-panel open requests (the `documentOpen` service). */
+    docOpenRequest: ObservableSnapshot<DocumentOpenRequest | null>
+  }
 }
 
-/** Full details-slot props: selection store, Tool output seat, injected close callback, and locale. */
-export type DetailsSlotProps = PropsRuntime<'details'> & PropsRenderSlots<'conversation.details.tool'>
-  & PropsStore<ChatStore> & DetailsInjected & PropsLocale<'conversation'>
+/** Full details-slot props: selection store, Tool/document output seats, injected close/open callbacks, and locale. */
+export type DetailsSlotProps = PropsRuntime<'details'> & PropsRenderSlots<'conversation.details.tool' | 'conversation.details.document'>
+  & PropsStore<ChatStore> & InjectFace<DetailsInjected> & PropsLocale<'conversation'>
 
 /** Owner share common to the hero / New-Session Workspace pickers. */
 export interface EmptyWorkspaceOwnerProps {

@@ -65,7 +65,14 @@ function ApprovalFlow({ pending, command, t }: {
   return (
     <div className={css.root} data-approval-key={pending.key}>
       <div className={css.card}>
-        <div className={css.strip}><span className={css.dot} />{t('approval.waiting')}</div>
+        {/* The strip carries the two reachable states: pending (amber) until a
+            decision is submitted, then a muted answered state while the
+            resolved frame is in flight — the buttons stay disabled either way,
+            and aria-live announces the transition. */}
+        <div className={css.strip} data-answered={answered || undefined} aria-live="polite">
+          <span className={css.dot} />
+          {answered ? t('approval.answered') : t('approval.waiting')}
+        </div>
         {/* Tab stop: the region scrolls once the command passes the cap and
             holds nothing focusable of its own, so without one a keyboard-only
             user cannot reach the command's tail before answering. */}
