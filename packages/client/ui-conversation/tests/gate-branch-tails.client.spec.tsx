@@ -56,6 +56,47 @@ function renderToolDetailsProbe(owners?: DetailsToolOwnerProps[]): DetailsSlotPr
   }
 }
 
+/** Direct-host the details panel with a caller-supplied request hook and open callbacks. */
+function renderDetailsPanel(
+  useDocOpenRequest: DetailsSlotProps['useDocOpenRequest'],
+  openDocument: (path: string) => void,
+  openDocumentPanel: () => void,
+) {
+  const chat = createChatStore().create()
+  const emptyList = createSnapshotStore<SessionListState>(
+    { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
+  const emptyWorkspaces = createSnapshotStore<WorkspaceListState>({
+    items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+    baselinesReady: true, recentWorkspaceId: undefined,
+  })
+  return render(
+    <DetailsPanel
+      SessionProvider={SessionProviderStub}
+      renderSlot={renderToolDetailsProbe()}
+      sessionId={SID}
+      useSession={bindSnapshotSelector({ getSnapshot: () => snapshotBase(), subscribe: () => () => {} })}
+      useSessions={bindSnapshotSelector(emptyList)}
+      useWorkspaces={bindSnapshotSelector(emptyWorkspaces)}
+      useProjection={(() => undefined)}
+      useInput={(() => { throw new Error('unused') })}
+      inputActions={{
+        setDraft: () => {},
+        addImages: () => true,
+        removeImage: () => {},
+        pruneImages: () => {},
+        submit: () => {},
+      }}
+      useStore={bindSnapshotSelector(chat)}
+      actions={chat.actions}
+      closeDetails={vi.fn()}
+      openDocument={openDocument}
+      openDocumentPanel={openDocumentPanel}
+      useDocOpenRequest={useDocOpenRequest}
+      t={t}
+    />,
+  )
+}
+
 function snapshotBase(): ConversationSnapshot {
   return {
     sessionId: SID, views: EMPTY_CONVERSATION_VIEWS, chat: EMPTY_CHAT_SNAPSHOT,
@@ -305,8 +346,6 @@ describe('render branch tails', () => {
 
   it('DetailsPanel consumes a published open request through the injected request hook', () => {
     localStorage.clear()
-    const snap = snapshotBase()
-    const chat = createChatStore().create()
     const openDocument = vi.fn()
     const openDocumentPanel = vi.fn()
     let request: { path: string | null; token: number } | null = null
@@ -319,39 +358,7 @@ describe('render branch tails', () => {
       },
     }
     const useDocOpenRequest = bindSnapshotSelector(requestSource)
-    const emptyList = createSnapshotStore<SessionListState>(
-      { ids: [], byId: {}, current: undefined, phase: 'ready', subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined })
-    const emptyWorkspaces = createSnapshotStore<WorkspaceListState>({
-      items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
-      baselinesReady: true, recentWorkspaceId: undefined,
-    })
-    const panelElement = () => (
-      <DetailsPanel
-        SessionProvider={SessionProviderStub}
-        renderSlot={renderToolDetailsProbe()}
-        sessionId={SID}
-        useSession={bindSnapshotSelector({ getSnapshot: () => snap, subscribe: () => () => {} })}
-        useSessions={bindSnapshotSelector(emptyList)}
-        useWorkspaces={bindSnapshotSelector(emptyWorkspaces)}
-        useProjection={(() => undefined)}
-        useInput={(() => { throw new Error('unused') })}
-        inputActions={{
-          setDraft: () => {},
-          addImages: () => true,
-          removeImage: () => {},
-          pruneImages: () => {},
-          submit: () => {},
-        }}
-        useStore={bindSnapshotSelector(chat)}
-        actions={chat.actions}
-        closeDetails={vi.fn()}
-        openDocument={openDocument}
-        openDocumentPanel={openDocumentPanel}
-        useDocOpenRequest={useDocOpenRequest}
-        t={t}
-      />
-    )
-    render(panelElement())
+    renderDetailsPanel(useDocOpenRequest, openDocument, openDocumentPanel)
     expect(openDocument).not.toHaveBeenCalled()
     // A published request routes into the injected write path.
     request = { path: 'notes/x.txt', token: 1 }
@@ -367,5 +374,33 @@ describe('render branch tails', () => {
     act(() => { for (const fn of listeners) fn() })
     expect(openDocumentPanel).toHaveBeenCalledTimes(1)
     expect(openDocument).toHaveBeenCalledTimes(2)
+  })
+
+  it('DetailsPanel swallows a pre-existing open request on mount (no re-pop on session switch)', () => {
+    localStorage.clear()
+    const openDocument = vi.fn()
+    const openDocumentPanel = vi.fn()
+    // A stale request the previous session already consumed stays parked in
+    // the apply-level source while the panel remounts for the new session.
+    let request: { path: string | null; token: number } | null = { path: 'notes/stale.txt', token: 7 }
+    const listeners = new Set<() => void>()
+    const requestSource = {
+      getSnapshot: () => request,
+      subscribe: (fn: () => void) => {
+        listeners.add(fn)
+        return () => { listeners.delete(fn) }
+      },
+    }
+    const useDocOpenRequest = bindSnapshotSelector(requestSource)
+    renderDetailsPanel(useDocOpenRequest, openDocument, openDocumentPanel)
+    // The mount-time request is treated as already handled: a session switch
+    // must not re-pop the document panel from a previous session's open.
+    expect(openDocument).not.toHaveBeenCalled()
+    expect(openDocumentPanel).not.toHaveBeenCalled()
+    // A genuinely new request still routes through the injected write path.
+    request = { path: 'notes/fresh.txt', token: 8 }
+    act(() => { for (const fn of listeners) fn() })
+    expect(openDocument).toHaveBeenCalledWith('notes/fresh.txt')
+    expect(openDocumentPanel).not.toHaveBeenCalled()
   })
 })

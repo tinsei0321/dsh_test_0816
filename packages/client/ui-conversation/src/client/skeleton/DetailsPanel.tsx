@@ -92,7 +92,11 @@ export function DetailsPanel({
   // service): every fresh request opens the column, pinning the path or
   // showing the document tab alone (a null-path panel request).
   const request = useDocOpenRequest(s => s)
-  const handledToken = useRef(0)
+  // Adopt the mount-time token so a stale cross-session request (still parked
+  // in the apply-level source after a previous session consumed it) is not
+  // re-consumed: the session-scoped panel remounts on every session switch,
+  // and re-firing the old request would re-pop the document tab each time.
+  const handledToken = useRef(request?.token ?? 0)
   useEffect(() => {
     if (request === null || request.token === handledToken.current) return
     handledToken.current = request.token
