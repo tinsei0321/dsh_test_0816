@@ -194,13 +194,14 @@ function WeekChart({ week, currency }: WeekChartProps) {
         </div>
       </div>
       <div className={css.xwrap}>
+        <div className={css.yearmark}>{week[0] !== undefined ? week[0].day.slice(0, 4) : ''}</div>
         {week.map(d => <div key={d.day} className={css.xtick}>{dateLabel(d.day)}</div>)}
       </div>
       {hovered !== undefined && tipPos !== null && (
         <div className={css.charttip} style={{ left: tipPos.x, top: tipPos.y }}>
           <div className={css.ttGrid}>
             <div className={css.ttCol}>
-              <div className={css.ttDate}>{dateLabel(hovered.day)}</div>
+              <div className={css.ttDate}>{hovered.day}</div>
               {COST_SERIES.map(s => (
                 <div key={s.key} className={css.ttRow}>
                   <span className={css.ttSwatch} style={{ background: s.color }} />

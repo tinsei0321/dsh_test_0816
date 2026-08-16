@@ -67,6 +67,21 @@ describe('UsageMonitor', () => {
     expect(segs.length).toBe(7)
   })
 
+  it('shows the full YYYY-MM-DD date in the hover tooltip and the year on the axis', async () => {
+    const load = vi.fn(async () => snapshot())
+    render(<UsageMonitor load={load} />)
+    const chip = screen.getByRole('button', { name: /用量监测/ })
+    await waitFor(() => { expect(screen.getByText('88.50 CNY')).toBeTruthy() })
+    act(() => { fireEvent.mouseEnter(chip) })
+    await waitFor(() => { expect(screen.getByText('用量监测', { selector: 'span' })).toBeTruthy() })
+    // The axis gutter carries the trailing week's year.
+    expect(screen.getByText('2026')).toBeTruthy()
+    // Hovering a column shows its full date, year included.
+    const columns = document.querySelectorAll('[class*="col"]:not([class*="colbars"])')
+    act(() => { fireEvent.mouseEnter(columns[0]!) })
+    expect(await screen.findByText('2026-08-10')).toBeTruthy()
+  })
+
   it('shows the failure reason instead of a balance when the snapshot reports one', async () => {
     const load = vi.fn(async () => snapshot({
       balance: { ok: false, reason: 'no-key' },

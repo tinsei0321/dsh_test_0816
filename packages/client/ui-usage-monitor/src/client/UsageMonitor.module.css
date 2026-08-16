@@ -235,8 +235,20 @@
 
 .xwrap {
   display: flex;
-  margin-left: 36px;
   margin-top: 4px;
+}
+
+/* The year the trailing week belongs to, sitting in the axis gutter so the
+   MM-DD ticks below each column stay unambiguous across years. */
+.yearmark {
+  flex: none;
+  width: 36px;
+  text-align: right;
+  padding-right: 6px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--um-axis-label);
+  font-variant-numeric: tabular-nums;
 }
 
 .xtick {
