@@ -86,7 +86,16 @@ export function apply(ctx: ClientContext): void {
       },
       codec: {
         clipboardText: ref => ref,
-        serialize: ref => Promise.resolve(ref),
+        // Inline the file's content (Codex semantics); a read failure falls
+        // back to the bare path so the model reads it with its `read` tool.
+        serialize: async (ref, signal) => {
+          try {
+            const content = await ctx.workspaces.readText(ref, signal)
+            return `File: ${ref}\n\n${content}`
+          } catch {
+            return ref
+          }
+        },
       },
     }
     ctx.effect(() => inputTriggers.registerSource(fileSource), 'ui-project: @ file source')

@@ -16,6 +16,7 @@ import { hostFrameSchema, muxFrameSchema } from '../api/events.schema.ts'
 import {
   hostCreateDirectoryValueSchema, hostDescribeValueSchema,
   hostListDirectoryValueSchema, hostListTreeEntriesValueSchema, hostOpenPathValueSchema, hostPickDirectoryValueSchema,
+  hostReadTextValueSchema,
 } from '../api/host.schema.ts'
 import {
   sessionCancelValueSchema,
@@ -112,6 +113,7 @@ export interface IApiClient {
     listTreeEntries(payload: RequestPayload<'host.listTreeEntries'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.listTreeEntries'>>>
     createDirectory(payload: RequestPayload<'host.createDirectory'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.createDirectory'>>>
     openPath(payload: RequestPayload<'host.openPath'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.openPath'>>>
+    readText(payload: RequestPayload<'host.readText'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.readText'>>>
   }
   workspace: {
     list(payload: RequestPayload<'workspace.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.list'>>>
@@ -193,6 +195,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'host.listTreeEntries': hostListTreeEntriesValueSchema,
   'host.createDirectory': hostCreateDirectoryValueSchema,
   'host.openPath': hostOpenPathValueSchema,
+  'host.readText': hostReadTextValueSchema,
   'workspace.list': workspaceListValueSchema,
   'workspace.create': workspaceCreateValueSchema,
   'workspace.rename': workspaceRenameValueSchema,
@@ -444,6 +447,7 @@ export abstract class AbstractApiClient implements IApiClient {
     listTreeEntries: (payload, signal) => this.callUnary('host.listTreeEntries', payload, signal),
     createDirectory: (payload, signal) => this.callUnary('host.createDirectory', payload, signal),
     openPath: (payload, signal) => this.callUnary('host.openPath', payload, signal),
+    readText: (payload, signal) => this.callUnary('host.readText', payload, signal),
   }
 
   readonly workspace: IApiClient['workspace'] = {

@@ -56,6 +56,14 @@ export interface IWorkspaces {
    */
   listTreeEntries(path: string, signal?: AbortSignal): Promise<TreeListing>
   /**
+   * Read one text file's content through the Host's `browse` capability
+   * (the '@' file reference serializes it inline).
+   * @param path - absolute file to read.
+   * @param signal - aborts the wire request (and the Host's read).
+   * @returns the file's decoded UTF-8 content.
+   */
+  readText(path: string, signal?: AbortSignal): Promise<string>
+  /**
    * Create one child directory through the Host's `browse` capability.
    * @param path - absolute existing parent directory.
    * @param name - single non-blank path segment.

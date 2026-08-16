@@ -10,7 +10,7 @@
  * @module @deepseek-ai/dsh-host-directory-picker-browse
  */
 
-import { mkdir, opendir, stat } from 'node:fs/promises'
+import { mkdir, opendir, readFile, stat } from 'node:fs/promises'
 import type { Dirent } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join, posix, resolve, win32 } from 'node:path'
@@ -238,6 +238,7 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
     list: (path, signal) => this.list(path, signal),
     listTreeEntries: (path, signal) => this.listTreeEntries(path, signal),
     createDirectory: (path, name) => this.createDirectory(path, name),
+    readText: (path, signal) => this.readText(path, signal),
   }
 
   constructor(ctx: Context, private readonly config: Config) {
@@ -423,6 +424,34 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
         throw new DirectoryPickerError('directory-exists', target, `${target} already exists`)
       }
       throw new DirectoryPickerError('directory-create-failed', target, `cannot create ${target}: ${messageOf(error)}`)
+    }
+  }
+
+  private async readText(path: string, signal?: AbortSignal): Promise<{ content: string }> {
+    // Same fully-qualified fence as list: never rebase a wire value under the
+    // host cwd or the current drive.
+    if (!fullyQualified(path)) {
+      throw new DirectoryPickerError('file-unreadable', path, `cannot read "${path}": not a fully qualified path`)
+    }
+    const target = resolve(path)
+    try {
+      const info = await raceAbort(stat(target), signal)
+      if (!info.isFile()) {
+        throw new DirectoryPickerError('file-unreadable', target, `${target} is not a regular file`)
+      }
+      // Inline content must stay small (the '@' file reference splices it into
+      // the message); a larger file falls back to the path and the agent's own
+      // `read` tool.
+      const MAX_INLINE_BYTES = 64 * 1024
+      if (info.size > MAX_INLINE_BYTES) {
+        throw new DirectoryPickerError('file-unreadable', target, `${target} is too large to inline`)
+      }
+      const content = await raceAbort(readFile(target, 'utf8'), signal)
+      return { content }
+    } catch (error: unknown) {
+      if (error instanceof DirectoryPickerError) throw error
+      signal?.throwIfAborted()
+      throw new DirectoryPickerError('file-unreadable', target, `cannot read ${target}: ${messageOf(error)}`)
     }
   }
 }

@@ -152,6 +152,20 @@ export class TestWorkspaces implements IWorkspaces {
   }
 
   /**
+   * Text-file content read (recorded). The default serves empty content; stub
+   * to shape a read.
+   * @param path - absolute file to read.
+   * @param signal - caller lifetime; recorded and forwarded like the production face.
+   * @returns the file's decoded UTF-8 content.
+   */
+  async readText(path: string, signal?: AbortSignal): Promise<string> {
+    this.calls.push({ method: 'readText', args: [path, signal] })
+    const stub = this.stubs.get('readText')
+    if (stub !== undefined) return await (stub(path, signal) as Promise<string>)
+    return ''
+  }
+
+  /**
    * Browse child creation (recorded). The default joins parent and name.
    * @param path - absolute existing parent directory.
    * @param name - single path segment.

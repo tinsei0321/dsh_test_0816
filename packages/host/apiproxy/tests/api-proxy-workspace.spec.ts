@@ -188,6 +188,10 @@ const BROWSE_STUB: DirectoryPickerCapability = {
     if (name === 'unwritable') throw new Error('disk detached')
     return `${path}/${name}`
   },
+  readText: async (path) => {
+    if (path === '/denied') throw new DirectoryPickerError('file-unreadable', '/denied', 'cannot read /denied')
+    return { content: `content of ${path}` }
+  },
 }
 
 describe('host.listDirectory / host.createDirectory', () => {
@@ -222,6 +226,7 @@ describe('host.listDirectory / host.createDirectory', () => {
       }),
       listTreeEntries: async () => ({ path: '/home/user', entries: [], truncated: false }),
       createDirectory: async () => '/never',
+      readText: async () => ({ content: '' }),
     })
     const abort = new AbortController()
     const pending = api.host.listDirectory(request({}), abort.signal)
@@ -272,6 +277,7 @@ describe('host.listTreeEntries', () => {
         signal?.addEventListener('abort', () => { reject(new Error('scan aborted')) }, { once: true })
       }),
       createDirectory: async () => '/never',
+      readText: async () => ({ content: '' }),
     })
     const abort = new AbortController()
     const pending = api.host.listTreeEntries(request({ path: '/home/user' }), abort.signal)

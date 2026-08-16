@@ -79,6 +79,7 @@ function scriptedApi(overrides: {
       listTreeEntries: r => ok(r, { path: r.payload.path, entries: [], truncated: false }),
       createDirectory: r => ok(r, { path: '/t/new' }),
       openPath: r => ok(r, { opened: true as const }),
+      readText: r => ok(r, { content: '' }),
       ...overrides.host,
     },
     workspace: {

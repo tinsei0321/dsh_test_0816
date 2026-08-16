@@ -76,6 +76,17 @@ describe('BrowseDirectoryPicker', () => {
     expect(listing.truncated).toBe(false)
   })
 
+  it('reads text files, and rejects directories and non-qualified paths', async () => {
+    const read = await capability.readText(join(root, 'notes.txt'))
+    expect(read.content).toBe('not a directory')
+
+    const dir = await capability.readText(root).catch((error: unknown) => error)
+    expect(dir).toMatchObject({ code: 'file-unreadable' })
+
+    const relative = await capability.readText('notes.txt').catch((error: unknown) => error)
+    expect(relative).toMatchObject({ code: 'file-unreadable' })
+  })
+
   it('cuts a level at maxEntries keeping the name-sorted head, and flags the cut', async () => {
     const ctx = new Context()
     const fiber = ctx.plugin(BrowseDirectoryPicker, { maxEntries: 1 })

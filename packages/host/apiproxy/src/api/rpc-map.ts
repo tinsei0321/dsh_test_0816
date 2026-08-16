@@ -44,6 +44,7 @@ export interface RpcMethodMap {
   'host.listTreeEntries': HostApi['listTreeEntries']
   'host.createDirectory': HostApi['createDirectory']
   'host.openPath': HostApi['openPath']
+  'host.readText': HostApi['readText']
   'workspace.list': WorkspaceApi['list']
   'workspace.create': WorkspaceApi['create']
   'workspace.rename': WorkspaceApi['rename']

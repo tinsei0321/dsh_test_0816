@@ -92,3 +92,13 @@ export const hostOpenPathRequestSchema = z.object({
 export const hostOpenPathValueSchema = z.object({
   opened: z.literal(true),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.openPath'>>>
+
+/** host.readText request payload; the file path is required. */
+export const hostReadTextRequestSchema = z.object({
+  path: z.string().min(1),
+}) satisfies z.ZodType<Wire<RequestPayload<'host.readText'>>>
+
+/** host.readText response value: the file's decoded UTF-8 content. */
+export const hostReadTextValueSchema = z.object({
+  content: z.string(),
+}) satisfies z.ZodType<Wire<ResponseValue<'host.readText'>>>

@@ -3008,6 +3008,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
         return runBrowseListing(ctx, request, 'host.listTreeEntries', signal, capability => capability.listTreeEntries(request.payload.path, signal))
       },
 
+      async readText(request, signal) {
+        return runBrowseListing(ctx, request, 'host.readText', signal, capability => capability.readText(request.payload.path, signal))
+      },
+
       async createDirectory(request) {
         const capability = ctx.directoryPicker.capability()
         if (capability.kind !== 'browse') {

@@ -131,4 +131,14 @@ export interface HostApi {
     request: RpcRequest<{ path: string }>,
     signal: AbortSignal,
   ): Promise<RpcResponse<{ opened: true }>>
+
+  /**
+   * Read one text file's content for the '@' file reference (and the document
+   * reader). Only served under the `browse` capability; a non-file, missing,
+   * or oversized target fails with `file-unreadable`.
+   */
+  readText(
+    request: RpcRequest<{ path: string }>,
+    signal: AbortSignal,
+  ): Promise<RpcResponse<{ content: string }>>
 }

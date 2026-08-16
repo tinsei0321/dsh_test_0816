@@ -128,6 +128,17 @@ export interface DirectoryPickerBrowseCapability {
    * `directory-create-failed` for a parent that is not fully qualified or any other failure.
    */
   createDirectory(path: string, name: string): Promise<string>
+  /**
+   * Read one text file's content (the in-app document reader and the '@' file
+   * reference serialize it). Only served under the `browse` capability; a
+   * non-file or oversized target fails with `file-unreadable`.
+   * @param path - absolute file to read.
+   * @param signal - caller lifetime; abort rejects with the caller's reason.
+   * @returns the file's decoded UTF-8 content.
+   * @throws {DirectoryPickerError} `file-unreadable` for a non-qualified,
+   * non-file, or oversized target, or any filesystem failure.
+   */
+  readText(path: string, signal?: AbortSignal): Promise<{ content: string }>
 }
 
 /**
@@ -144,7 +155,7 @@ export interface DirectoryPickerCapabilities {
 export type DirectoryPickerCapability = DirectoryPickerCapabilities[keyof DirectoryPickerCapabilities]
 
 /** Closed failure vocabulary of the browse primitives (mirrored onto the wire by consumers). */
-export type DirectoryPickerErrorCode = 'directory-unreadable' | 'directory-exists' | 'directory-create-failed'
+export type DirectoryPickerErrorCode = 'directory-unreadable' | 'directory-exists' | 'directory-create-failed' | 'file-unreadable'
 
 /** Typed failure thrown by browse primitives so consumers can map business codes without string matching. */
 export class DirectoryPickerError extends Error {
