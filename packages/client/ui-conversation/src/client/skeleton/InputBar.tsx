@@ -26,6 +26,7 @@ import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ComposerAttachment, ComposerBarProps } from '../contract/slots.ts'
 import { deriveDecorations } from '../input/decorations.ts'
 import type { DraftDecorations } from '../input/decorations.ts'
+import { recallLastUserText } from '../conversation-nodes/user.ts'
 import {
   attachmentErrorText, attachmentRailLabels, dropOverlayLabels, imageSizeText, lightboxLabels,
 } from '../image-labels.ts'
@@ -59,6 +60,10 @@ export function InputBar({
   const running = useSession(s => s.running) ?? false
   const subagent = useSession(s => s.subagent) ?? null
   const removed = useSession(s => s.removed) ?? false
+  // Last finalized user prompt text (null before the first message): the ↑
+  // edit-previous recall source. Derived to a primitive so a streaming node
+  // append does not re-render the composer until a new user message lands.
+  const lastUserText = useSession(s => recallLastUserText(s.nodes)) ?? null
   // Plan mode swaps the textarea placeholder (the projection is the folded
   // host value; owner-prop placeholders — hero, session-unavailable — win).
   const planActive = useProjection('plan', plan => plan !== undefined && (plan.pending ? !plan.active : plan.active))
@@ -285,7 +290,19 @@ export function InputBar({
     // oxlint-disable-next-line typescript/no-deprecated
     const composing = composingRef.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      if (keyboard.arbitrate(e.key === 'ArrowUp' ? 'up' : 'down', composing) === 'consumed') e.preventDefault()
+      if (keyboard.arbitrate(e.key === 'ArrowUp' ? 'up' : 'down', composing) === 'consumed') {
+        e.preventDefault()
+        return
+      }
+      // Empty-draft ↑ recalls the last user prompt for editing (Codex's
+      // edit-previous). A consuming menu, a busy/locked composer, or a
+      // composing IME already returned above; a blank session (null) keeps the
+      // native caret move so ↑ still walks the (empty) textarea.
+      if (e.key === 'ArrowUp' && !composing && empty && !locked && !machineBusy && lastUserText !== null && lastUserText !== '') {
+        e.preventDefault()
+        keyboard.setDraft(lastUserText)
+        restoreCaret(e.currentTarget, lastUserText.length)
+      }
       return
     }
     if (e.key === 'Escape') {
