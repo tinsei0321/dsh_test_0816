@@ -50,7 +50,21 @@ describe('UsageMonitor', () => {
     expect(screen.getByText('赠送')).toBeTruthy()
     expect(screen.getByText('充值')).toBeTruthy()
     expect(screen.getByText('2,800')).toBeTruthy() // today generated+context+cached
-    expect(screen.getByText('¥0.01')).toBeTruthy() // today cost, CNY
+    // Today cost (CNY); the axis mid label renders the same value, so both match.
+    expect(screen.getAllByText('¥0.01').length).toBeGreaterThan(0)
+  })
+
+  it('renders cost bars for every day of the week (not only today)', async () => {
+    const load = vi.fn(async () => snapshot())
+    render(<UsageMonitor load={load} />)
+    const chip = screen.getByRole('button', { name: /用量监测/ })
+    await waitFor(() => { expect(screen.getByText('88.50 CNY')).toBeTruthy() })
+    act(() => { fireEvent.mouseEnter(chip) })
+    await waitFor(() => { expect(screen.getByText('用量监测', { selector: 'span' })).toBeTruthy() })
+    // One stacked cost segment per day: all seven days carry cost data, so
+    // all seven columns render a bar (the token-based bars only drew today).
+    const segs = document.querySelectorAll('[class*="seg"]')
+    expect(segs.length).toBe(7)
   })
 
   it('shows the failure reason instead of a balance when the snapshot reports one', async () => {

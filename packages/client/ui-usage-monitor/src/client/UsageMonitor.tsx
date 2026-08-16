@@ -21,20 +21,14 @@ export type UsageMonitorProps = UsageMonitorInjected
 
 /** Chart series colors are data, not theme tokens: segment identity must survive theming. */
 interface SeriesDef {
-  key: 'generated' | 'context' | 'cached'
+  key: 'proCost' | 'flashCost'
   label: string
   color: string
 }
 
-const SERIES: readonly SeriesDef[] = [
-  { key: 'generated', label: '生成', color: '#0C70F3' },
-  { key: 'context', label: '上下文', color: '#60B3FE' },
-  { key: 'cached', label: '缓存', color: '#A0DCFD' },
-]
-
-const COST_SERIES = [
-  { key: 'proCost' as const, label: 'Pro', color: '#0C70F3' },
-  { key: 'flashCost' as const, label: 'Flash', color: '#60B3FE' },
+const COST_SERIES: readonly SeriesDef[] = [
+  { key: 'proCost', label: 'Pro', color: '#0C70F3' },
+  { key: 'flashCost', label: 'Flash', color: '#60B3FE' },
 ]
 
 const TIP_W = 208
@@ -44,12 +38,6 @@ const REFRESH_MS = 10_000
 
 function pad2(x: number): string {
   return String(x).padStart(2, '0')
-}
-
-function fmtTokens(n: number): string {
-  if (n >= 1000000) return `${Math.round(n / 100000) / 10}M`
-  if (n >= 1000) return `${Math.round(n / 100) / 10}K`
-  return String(n)
 }
 
 function fmtInt(n: number): string {
@@ -94,7 +82,14 @@ function niceCeil(n: number): number {
 }
 
 const dateLabel = (day: string): string => day.slice(5)
-const fmtAxis = (v: number): string => (v >= 1000 ? fmtTokens(v) : String(Math.round(v)))
+
+/** Axis label of a cost value: the currency symbol with up to two decimals. */
+function fmtAxisCost(v: number, currency: string): string {
+  const sym = currency === 'CNY' ? '\u00a5' : '$'
+  if (v >= 1) return `${sym}${v.toFixed(1).replace(/\.0$/, '')}`
+  if (v > 0) return `${sym}${v.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}`
+  return `${sym}0`
+}
 
 interface WeekChartProps {
   week: UsageSnapshot['week']
@@ -149,16 +144,20 @@ function WeekChart({ week, currency }: WeekChartProps) {
     return () => { window.removeEventListener('resize', place) }
   }, [hover, plotW])
 
-  const totals = week.map(d => d.generated + d.context + d.cached)
-  const max = niceCeil(Math.max(1, ...totals))
+  // The official platform's "last 7 days" chart is a cost chart: bars draw
+  // the official (or locally estimated) per-tier cost, so every day with
+  // cost data renders a bar — token counts are not available from the
+  // official API and were the reason only today's bar ever appeared.
+  const totals = week.map(d => d.proCost + d.flashCost)
+  const max = niceCeil(Math.max(Number.EPSILON, ...totals))
   const mid = max / 2
   const colW = plotW > 0 ? plotW / 7 : 0
-  const yLabels = [fmtAxis(max), fmtAxis(mid), '0']
+  const yLabels = [fmtAxisCost(max, currency), fmtAxisCost(mid, currency), fmtAxisCost(0, currency)]
 
   const columns = week.map((d, i) => {
     const segs = []
-    const visible = SERIES.filter(s => d[s.key] > 0)
-    for (const s of SERIES) {
+    const visible = COST_SERIES.filter(s => d[s.key] > 0)
+    for (const s of COST_SERIES) {
       const v = d[s.key]
       if (v <= 0) continue
       const isTop = visible[visible.length - 1] === s
