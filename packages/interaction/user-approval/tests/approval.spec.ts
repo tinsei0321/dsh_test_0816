@@ -373,12 +373,27 @@ describe('approval policy (the approval/policy fold)', () => {
     expect(session.events.at(-1)).toMatchObject({ type: 'approval/policy', data: { policy: 'ask' } })
   })
 
+  it('flips to always-allow on a session-wide grant and then auto-approves', async () => {
+    const ctx = new Context()
+    await ctx.plugin(ApprovalService)
+    const { agent, session } = sessionAgent('sess-always-allow')
+
+    ctx.on('approval/request', () => Promise.resolve<ApprovalOutcome>('allowed-for-session'))
+    await expect(ctx.approval.request({ agent, toolName: 'bash' })).resolves.toBe('allowed-for-session')
+    expect(effectiveApprovalPolicy(session.events)).toBe('always-allow')
+
+    // Under always-allow the answerer chain is never consulted: a rejecting
+    // answerer still yields the deterministic auto-approve.
+    ctx.on('approval/request', () => Promise.resolve<ApprovalOutcome>('rejected'))
+    await expect(ctx.approval.request({ agent, toolName: 'bash' })).resolves.toBe('allowed-once')
+  })
+
   it('rejects a policy outside the closed vocabulary before appending', () => {
     const append = vi.fn()
     const session = { append } as unknown as Session
 
     expect(() => { setApprovalPolicy(session, 'sometimes' as Parameters<typeof setApprovalPolicy>[1]) })
-      .toThrow('approval policy must be one of "ask" or "never"')
+      .toThrow('approval policy must be one of "ask", "never", or "always-allow"')
     expect(append).not.toHaveBeenCalled()
   })
 

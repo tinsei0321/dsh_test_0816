@@ -2996,7 +2996,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         if (!approvalPending) return Promise.resolve({ accepted: false, reason: 'not-pending' })
         if (!message.result.ok) return Promise.resolve({ accepted: false, reason: 'bad-response' })
         const value = message.result.value as { approvalId?: unknown; outcome?: unknown }
-        if (value.approvalId !== pendingApprovalId || (value.outcome !== 'allowed-once' && value.outcome !== 'rejected')) {
+        if (value.approvalId !== pendingApprovalId || (value.outcome !== 'allowed-once' && value.outcome !== 'allowed-for-session' && value.outcome !== 'rejected')) {
           return Promise.resolve({ accepted: false, reason: 'bad-response' })
         }
         approvalPending = false
