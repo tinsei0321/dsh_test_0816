@@ -97,6 +97,11 @@
     - id: plugin-inventory
       name: '@deepseek-ai/dsh-host-plugin-inventory'
 
+    # Usage monitor gateway: balance + official cost + week token aggregates
+    # over the session corpus, served as the usageMonitor Remote.
+    - id: usage-monitor
+      name: '@deepseek-ai/dsh-host-usage-monitor'
+
     # The API gateway: the transport-agnostic dispatch face every client shape
     # shares. The base layer's agent-default-model service owns the default model.
     - id: api-gateway
@@ -200,6 +205,10 @@
 
     - id: ui-conversation
       name: '@deepseek-ai/dsh-client-ui-conversation'
+
+    # Balance chip + hover panel in the conversation input strip.
+    - id: ui-usage-monitor
+      name: '@deepseek-ai/dsh-client-ui-usage-monitor'
 
     # Tool call tree, generic fallback, and keyed business Tool views.
     - id: ui-tool
