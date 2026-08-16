@@ -82,6 +82,30 @@ describe('UsageMonitor', () => {
     expect(await screen.findByText('2026-08-10')).toBeTruthy()
   })
 
+  it('sticks the tooltip beside the hovered column (not parked above the panel)', async () => {
+    const load = vi.fn(async () => snapshot())
+    render(<UsageMonitor load={load} />)
+    const chip = screen.getByRole('button', { name: /用量监测/ })
+    await waitFor(() => { expect(screen.getByText('88.50 CNY')).toBeTruthy() })
+    act(() => { fireEvent.mouseEnter(chip) })
+    await waitFor(() => { expect(screen.getByText('用量监测', { selector: 'span' })).toBeTruthy() })
+    const tip = (): HTMLElement | null => document.querySelector('[class*="charttip"]')
+    // Not rendered before any column is hovered.
+    expect(tip()).toBeNull()
+    // Hovering a column places the card beside it (right of the axis gutter)
+    // and follows the cursor vertically.
+    const columns = document.querySelectorAll('[class*="col"]:not([class*="colbars"])')
+    act(() => { fireEvent.mouseEnter(columns[1]!, { clientY: 120 }) })
+    await waitFor(() => {
+      const el = tip()
+      expect(el).not.toBeNull()
+      const left = Number((el as HTMLElement).style.left.replace('px', ''))
+      const top = Number((el as HTMLElement).style.top.replace('px', ''))
+      expect(left).toBeGreaterThan(30)
+      expect(top).toBeGreaterThanOrEqual(0)
+    })
+  })
+
   it('shows the failure reason instead of a balance when the snapshot reports one', async () => {
     const load = vi.fn(async () => snapshot({
       balance: { ok: false, reason: 'no-key' },

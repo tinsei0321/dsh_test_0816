@@ -100,6 +100,7 @@ interface WeekChartProps {
 
 function WeekChart({ week, currency }: WeekChartProps) {
   const [hover, setHover] = useState<number | null>(null)
+  const [hoverY, setHoverY] = useState<number | null>(null)
   const [tipPos, setTipPos] = useState<{ x: number; y: number } | null>(null)
   const chartRef = useRef<HTMLDivElement | null>(null)
   const [plotW, setPlotW] = useState(0)
@@ -117,8 +118,11 @@ function WeekChart({ week, currency }: WeekChartProps) {
     return undefined
   }, [])
 
+  // The tooltip sticks to the hovered column (the official chart's adaptive
+  // behavior): the card sits beside the bar, flipping to the other side when
+  // the viewport runs out, and follows the cursor vertically.
   useLayoutEffect(() => {
-    if (hover === null) {
+    if (hover === null || hoverY === null) {
       setTipPos(null)
       return
     }
@@ -130,21 +134,24 @@ function WeekChart({ week, currency }: WeekChartProps) {
       const vw = window.innerWidth
       const vh = window.innerHeight
       const colW = plotW > 0 ? plotW / 7 : Math.max(1, rect.width - 36) / 7
-      const baseX = rect.left + 36 + (hover + 0.5) * colW
-      let x = baseX + 12
-      if (x + TIP_W + margin > vw) x = baseX - TIP_W - 12
+      const colLeft = rect.left + 36 + hover * colW
+      const colRight = colLeft + colW
+      // Prefer the right side of the column; flip to the left when there is
+      // no room on the right.
+      let x = colRight + margin
+      if (x + TIP_W + margin > vw) x = colLeft - TIP_W - margin
       x = Math.max(margin, Math.min(x, vw - TIP_W - margin))
-      const panelEl = chartEl.closest(`.${css.panel}`)
-      const anchor = panelEl !== null ? panelEl.getBoundingClientRect() : rect
-      let y = anchor.top - TIP_H - margin
-      if (y < margin) y = anchor.bottom + margin
-      if (y + TIP_H > vh - margin) y = Math.max(margin, vh - margin - TIP_H)
+      // Follow the cursor, slightly below it; flip above when the bottom
+      // would overflow.
+      let y = hoverY + 14
+      if (y + TIP_H > vh - margin) y = Math.max(margin, hoverY - TIP_H - 14)
+      y = Math.max(margin, y)
       setTipPos({ x, y })
     }
     place()
     window.addEventListener('resize', place)
     return () => { window.removeEventListener('resize', place) }
-  }, [hover, plotW])
+  }, [hover, hoverY, plotW])
 
   // The official platform's "last 7 days" chart is a cost chart: bars draw
   // the official (or locally estimated) per-tier cost, so every day with
@@ -170,7 +177,12 @@ function WeekChart({ week, currency }: WeekChartProps) {
       }} />)
     }
     return (
-      <div key={d.day} className={css.col} onMouseEnter={() => { setHover(i) }}>
+      <div
+        key={d.day}
+        className={css.col}
+        onMouseEnter={(e) => { setHover(i); setHoverY(e.clientY) }}
+        onMouseMove={(e) => { setHoverY(e.clientY) }}
+      >
         <div className={css.colbars}>{segs}</div>
       </div>
     )
@@ -178,7 +190,7 @@ function WeekChart({ week, currency }: WeekChartProps) {
 
   const hovered = hover !== null ? week[hover] : undefined
   return (
-    <div className={css.chart} ref={chartRef} onMouseLeave={() => { setHover(null) }}>
+    <div className={css.chart} ref={chartRef} onMouseLeave={() => { setHover(null); setHoverY(null) }}>
       <div className={css.chartMain}>
         <div className={css.yaxis}>
           {yLabels.map((label, i) => <div key={i} className={css.ytick}>{label}</div>)}
