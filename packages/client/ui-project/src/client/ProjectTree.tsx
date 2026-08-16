@@ -24,6 +24,7 @@ import type { GitStatusLetter, TreeEntry } from '@deepseek-ai/dsh-client-runtime
 import type { ProjectTreeProps } from './contract/slots.ts'
 import type { ProjectKey } from './locales.ts'
 import { currentWorkspacePath } from './current-workspace.ts'
+import { deriveFolderStatuses, normalizePath } from './folder-status.ts'
 import css from './ProjectTree.module.css'
 
 /** Locale keys of the git decoration letters (VS Code SCM semantics). */
@@ -68,6 +69,12 @@ export function ProjectTree({
   const selectedPath = useStore(s => s.selectedPath)
   const showHidden = useStore(s => s.showHidden)
   const gitStatuses = useStore(s => s.gitStatuses)
+  // Ancestor tinting (VS Code's folder merge): every directory under the
+  // root that contains a decorated file carries the aggregate letter.
+  const folderDots = useMemo(
+    () => deriveFolderStatuses(gitStatuses, rootPath ?? ''),
+    [gitStatuses, rootPath],
+  )
 
   // In-flight loads by directory path. Component-private: the map dies with
   // the tree (rail collapse), while the store carries the settled facts.
@@ -186,11 +193,13 @@ export function ProjectTree({
 
   const renderDirectoryRow = (entry: TreeEntry): ReactNode => {
     const isExpanded = expanded.includes(entry.path)
+    const folderLetter = folderDots[normalizePath(entry.path)]
     return (
       <div key={entry.path} role="treeitem" aria-expanded={isExpanded}>
         <button
           type="button"
           className={css.row}
+          data-status={folderLetter}
           aria-label={t('project.toggle', { name: entry.name, state: isExpanded ? t('project.collapse') : t('project.expand') })}
           onClick={() => { toggle(entry.path) }}
         >
@@ -240,6 +249,7 @@ export function ProjectTree({
   }
 
   const rootExpanded = rootPath !== null && expanded.includes(rootPath)
+  const rootLetter = rootPath === null ? undefined : folderDots[normalizePath(rootPath)]
 
   // The collapsed rail: a single re-open affordance (Codex's sidebar toggle),
   // keeping the column mounted so a tap restores the tree.
@@ -287,6 +297,7 @@ export function ProjectTree({
               <button
                 type="button"
                 className={css.rootRow}
+                data-status={rootLetter}
                 aria-label={t('project.toggle', { name: baseNameOf(rootPath), state: rootExpanded ? t('project.collapse') : t('project.expand') })}
                 onClick={() => { toggle(rootPath) }}
               >

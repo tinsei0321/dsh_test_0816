@@ -259,6 +259,31 @@ describe('ProjectTree', () => {
     expect(b.listTreeEntries.mock.calls.length).toBe(calls)
   })
 
+  it('tints folder rows (and the root row) whose descendants carry a git status', async () => {
+    const b = buildProps()
+    b.listTreeEntries.mockResolvedValue({ path: '/w', entries: [DIR], truncated: false })
+    b.gitStatus.mockResolvedValue({
+      root: '/w',
+      entries: [{ path: '/w/src/deep.ts', status: 'M' }],
+    })
+    const view = render(<ProjectTree {...b.props} />)
+    await view.findByText('src')
+    // The containing folder and the root row carry the aggregate letter.
+    expect(view.getByText('src').closest('button')?.getAttribute('data-status')).toBe('M')
+    expect(view.getByRole('button', { name: /折叠/ }).getAttribute('data-status')).toBe('M')
+    // A sibling folder outside the decorated subtree stays plain.
+    const b2 = buildProps()
+    b2.listTreeEntries.mockResolvedValue({
+      path: '/w',
+      entries: [DIR, { name: 'clean', path: '/w/clean', kind: 'directory' as const, hidden: false }],
+      truncated: false,
+    })
+    b2.gitStatus.mockResolvedValue({ root: '/w', entries: [{ path: '/w/src/deep.ts', status: 'M' }] })
+    const second = render(<ProjectTree {...b2.props} />)
+    await second.findByText('clean')
+    expect(second.getByText('clean').closest('button')?.hasAttribute('data-status')).toBe(false)
+  })
+
   it('fetches the git status once per root and renders colored dots on changed files', async () => {
     const b = buildProps()
     b.listTreeEntries.mockResolvedValue({
@@ -281,8 +306,10 @@ describe('ProjectTree', () => {
     expect(modified.getAttribute('data-status')).toBe('M')
     expect(modified.closest('button')?.textContent).toContain('README.md')
     expect(view.getByLabelText('未跟踪').getAttribute('data-status')).toBe('U')
-    // A directory row never carries a dot.
-    expect(view.container.querySelectorAll('[data-status]')).toHaveLength(2)
+    // Exactly the two file dots (role=img spans); the root row tint is
+    // data-status on the button, not an extra dot.
+    expect(view.container.querySelectorAll('span[role="img"][data-status]')).toHaveLength(2)
+    expect(view.getByRole('button', { name: /折叠/ }).getAttribute('data-status')).toBe('M')
   })
 
   it('a failed git scan settles as no dots (decorative feature)', async () => {

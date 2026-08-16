@@ -195,6 +195,36 @@
   background: var(--dsw-alias-scm-conflict);
 }
 
+/* Folder rows carry the aggregate status of their descendants (VS Code's
+   folder merge): the folder name tints with the letter color, so a folder
+   containing changes is visible even while collapsed. */
+.row[data-status='M'] .name,
+.rootRow[data-status='M'] .name {
+  color: var(--dsw-alias-scm-modified);
+}
+
+.row[data-status='A'] .name,
+.row[data-status='R'] .name,
+.rootRow[data-status='A'] .name,
+.rootRow[data-status='R'] .name {
+  color: var(--dsw-alias-scm-added);
+}
+
+.row[data-status='U'] .name,
+.rootRow[data-status='U'] .name {
+  color: var(--dsw-alias-scm-untracked);
+}
+
+.row[data-status='D'] .name,
+.rootRow[data-status='D'] .name {
+  color: var(--dsw-alias-scm-deleted);
+}
+
+.row[data-status='C'] .name,
+.rootRow[data-status='C'] .name {
+  color: var(--dsw-alias-scm-conflict);
+}
+
 .name {
   min-width: 0;
   overflow: hidden;
