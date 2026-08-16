@@ -21,8 +21,10 @@ export type HeaderDocumentButtonProps = PropsRuntime<'conversation.session.heade
  * The files pill: hidden while the session touched nothing, otherwise shows
  * the touched-file count and routes the click to the document tab.
  * @param props - runtime share, injected opener, and the locale seat.
+ * @returns the pill, or null while the session has no touched files.
  */
-export function HeaderDocumentButton({ openPanel, useSession, t }: HeaderDocumentButtonProps) {
+export function HeaderDocumentButton(props: HeaderDocumentButtonProps) {
+  const { openPanel, useSession, t } = props
   const count = useSession(snapshot => deriveDocuments(snapshot).length)
   if (count === 0) return null
   return (

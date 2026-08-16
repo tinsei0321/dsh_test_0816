@@ -29,12 +29,20 @@ export type DocumentPanelProps =
   & PropsStore<ReturnType<typeof createDocumentViewStore>>
   & PropsLocale<'document'>
 
-/** Whether the reader's reading mode renders Markdown for this path. */
+/**
+ * Whether the reader's reading mode renders Markdown for this path.
+ * @param path - the file path to classify.
+ * @returns true for Markdown extensions.
+ */
 export function isMarkdownPath(path: string): boolean {
   return /\.(md|markdown)$/i.test(path)
 }
 
-/** Whether the reader offers the HTML render mode (Codex artifact preview). */
+/**
+ * Whether the reader offers the HTML render mode (Codex artifact preview).
+ * @param path - the file path to classify.
+ * @returns true for HTML extensions.
+ */
 export function isHtmlPath(path: string): boolean {
   return /\.(html?)$/i.test(path)
 }
@@ -101,10 +109,15 @@ function ReaderBody({
   )
 }
 
-/** The document half of the details panel (see module doc). */
-export function DocumentPanel({
-  docs, doc, onOpen, onClose, cwd, useSession, useStore, actions, t,
-}: DocumentPanelProps) {
+/**
+ * The document half of the details panel (see module doc).
+ * @param props - the panel owner currency, the viewing store, and the locale seat.
+ * @returns the document tab UI.
+ */
+export function DocumentPanel(props: DocumentPanelProps) {
+  const {
+    docs, doc, onOpen, onClose, cwd, useSession, useStore, actions, t,
+  } = props
   const snapshot = useSession((s: ConversationSnapshot) => s)
   const viewMode = useStore(s => s.viewMode)
   const entries = useMemo(() => deriveDocuments(snapshot), [snapshot])

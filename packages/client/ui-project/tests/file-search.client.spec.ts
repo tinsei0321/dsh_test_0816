@@ -6,7 +6,7 @@ interface Row { name: string; path: string; kind: 'file' | 'directory'; hidden: 
 const TREE: Record<string, Row[]> = {
   '/root': [
     { name: 'src', path: '/root/src', kind: 'directory', hidden: false },
-    { name: 'docs', path: '/root/docs', kind: 'directory', hidden: false },
+    { name: 'guides', path: '/root/guides', kind: 'directory', hidden: false },
     { name: 'node_modules', path: '/root/node_modules', kind: 'directory', hidden: false },
     { name: 'package.json', path: '/root/package.json', kind: 'file', hidden: false },
   ],
@@ -14,8 +14,8 @@ const TREE: Record<string, Row[]> = {
     { name: 'index.ts', path: '/root/src/index.ts', kind: 'file', hidden: false },
     { name: 'utils.ts', path: '/root/src/utils.ts', kind: 'file', hidden: false },
   ],
-  '/root/docs': [
-    { name: 'readme.md', path: '/root/docs/readme.md', kind: 'file', hidden: false },
+  '/root/guides': [
+    { name: 'readme.md', path: '/root/guides/readme.md', kind: 'file', hidden: false },
   ],
   '/root/node_modules': [
     { name: 'foo', path: '/root/node_modules/foo', kind: 'directory', hidden: false },
@@ -30,7 +30,7 @@ const listTreeEntries: ListTreeEntries = (path, _signal) => Promise.resolve({ en
 describe('searchWorkspaceFiles', () => {
   it('finds files by name across the tree', async () => {
     const res = await searchWorkspaceFiles(listTreeEntries, '/root', 'readme', new AbortController().signal)
-    expect(res.map(c => c.name)).toEqual(['/root/docs/readme.md'])
+    expect(res.map(c => c.name)).toEqual(['/root/guides/readme.md'])
   })
 
   it('does not descend into skipped directories', async () => {
@@ -45,11 +45,11 @@ describe('searchWorkspaceFiles', () => {
 
   it('matches case-insensitively', async () => {
     const res = await searchWorkspaceFiles(listTreeEntries, '/root', 'README', new AbortController().signal)
-    expect(res.map(c => c.name)).toEqual(['/root/docs/readme.md'])
+    expect(res.map(c => c.name)).toEqual(['/root/guides/readme.md'])
   })
 
   it('skips an unreadable level instead of failing the walk', async () => {
-    const throwing: ListTreeEntries = (path, _signal) => path === '/root/docs'
+    const throwing: ListTreeEntries = (path, _signal) => path === '/root/guides'
       ? Promise.reject(new Error('denied'))
       : Promise.resolve({ entries: TREE[path] ?? [] })
     const res = await searchWorkspaceFiles(throwing, '/root', 'readme', new AbortController().signal)

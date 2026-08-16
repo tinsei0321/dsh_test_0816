@@ -9,7 +9,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 
 /** No host services: this half only carries the browser roster row. */
-export const inject = [] as const
+export const inject = []
 
 /**
  * Node half body — intentionally empty; see the module doc.

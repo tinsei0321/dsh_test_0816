@@ -10,6 +10,8 @@ import type { ConversationNode } from '@deepseek-ai/dsh-client-runtime/client'
  * follow-ups or injected history, not the turn-opening prompt a user means to
  * re-edit. Non-text blocks (images) are skipped; text blocks concatenate in
  * order so a multi-block prompt recalls verbatim.
+ * @param nodes - the session's finalized conversation nodes, oldest first.
+ * @returns the recalled prompt text, or null when no user message exists.
  */
 export function recallLastUserText(nodes: readonly ConversationNode[]): string | null {
   for (let i = nodes.length - 1; i >= 0; i -= 1) {

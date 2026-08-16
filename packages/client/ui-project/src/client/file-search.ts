@@ -31,6 +31,11 @@ export type ListTreeEntries = (
  * directories. Directories always enqueue (deeper matches need them), but only
  * surface as candidates when their own name matches; files surface on a name
  * match. The caller's abort signal stops the walk early (superseded query).
+ * @param listTreeEntries - the runtime's directory-listing face.
+ * @param root - the absolute workspace path the walk starts from.
+ * @param query - the case-insensitive name fragment to match.
+ * @param signal - aborts the walk; a superseded query cancels its predecessor.
+ * @returns matched files (and matched directories) as input-trigger candidates.
  */
 export async function searchWorkspaceFiles(
   listTreeEntries: ListTreeEntries,
@@ -68,7 +73,11 @@ export async function searchWorkspaceFiles(
   return out
 }
 
-/** Base name of a path (last path segment across both separators). */
+/**
+ * Base name of a path (last path segment across both separators).
+ * @param path - the path to take the last segment from.
+ * @returns the final segment, or the whole path when it has no separator.
+ */
 export function basenameOf(path: string): string {
   const i = Math.max(path.lastIndexOf('\\'), path.lastIndexOf('/'))
   return i >= 0 ? path.slice(i + 1) : path
