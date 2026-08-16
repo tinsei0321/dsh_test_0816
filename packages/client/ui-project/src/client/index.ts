@@ -9,7 +9,7 @@
  * column collapse toggle drives the layout service. Composing this plugin out
  * of cordis.yml leaves the column empty at zero cost.
  */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the cordis Context merge declaring the optional
 // `documentOpen` service and its DocumentOpen type.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -17,10 +17,15 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+// Type-only: pulls the input-trigger Context merge (ctx.inputTriggers).
+import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { ProjectTree } from './ProjectTree.tsx'
 import type { ProjectTreeInjected } from './contract/slots.ts'
 import { createProjectTreeStore } from './stores.ts'
 import { en, NS, zh, type ProjectKey } from './locales.ts'
+import type { InputTriggerServiceContract, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import { currentWorkspacePath } from './current-workspace.ts'
+import { basenameOf, searchWorkspaceFiles } from './file-search.ts'
 
 export type { ProjectTreeInjected, ProjectTreeProps } from './contract/slots.ts'
 export type { ProjectKey } from './locales.ts'
@@ -57,4 +62,33 @@ export function apply(ctx: ClientContext): void {
       inject: injected,
     }, ProjectTree),
   )
+
+  // '@' file reference source: fuzzy-search the workspace and insert a chip.
+  // Serialization ships the path (the model reads it with its `read` tool);
+  // content inlining is a follow-up behind a host read-text RPC. Both the
+  // trigger pipeline and the sessions feed are optional — without them the
+  // tree still registers and the '@' file source simply stays absent.
+  const inputTriggers = ctx.get('inputTriggers') as InputTriggerServiceContract | undefined
+  if (inputTriggers !== undefined) {
+    const fileSource: InputTriggerSource = {
+      trigger: '@',
+      name: 'file',
+      candidates(_session, { query, signal }) {
+        const sessions = ctx.get('sessions') as { list: { getSnapshot(): SessionListState } } | undefined
+        if (sessions === undefined) return Promise.resolve([])
+        const root = currentWorkspacePath(ctx.workspaces.list.getSnapshot(), sessions.list.getSnapshot())
+        if (root === null) return Promise.resolve([])
+        return searchWorkspaceFiles((path, sig) => ctx.workspaces.listTreeEntries(path, sig), root, query, signal)
+      },
+      onPick({ candidate }) {
+        const path = candidate.name
+        return { insert: { source: 'file', ref: path, label: basenameOf(path), clipboardText: path } }
+      },
+      codec: {
+        clipboardText: ref => ref,
+        serialize: ref => Promise.resolve(ref),
+      },
+    }
+    ctx.effect(() => inputTriggers.registerSource(fileSource), 'ui-project: @ file source')
+  }
 }
