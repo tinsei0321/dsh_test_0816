@@ -568,6 +568,20 @@ describe('createFixtureApi', () => {
     expect(missing.result).toMatchObject({ ok: false, error: { code: 'directory-unreadable' } })
   })
 
+  it('gitStatus serves the fixed small repo decorations and its root', async () => {
+    const api = createFixtureApi()
+    const status = await api.host.gitStatus(req({ path: '/home/fixture/repo' }), new AbortController().signal)
+    if (!status.result.ok) throw new Error('git status failed')
+    expect(status.result.value).toEqual({
+      root: '/home/fixture/repo',
+      entries: [
+        { path: '/home/fixture/repo/src/modified.ts', status: 'M' },
+        { path: '/home/fixture/repo/new-file.md', status: 'U' },
+        { path: '/home/fixture/repo/gone.ts', status: 'D' },
+      ],
+    })
+  })
+
   it('workspace.list serves the resident account and create reuses on path collision', async () => {
     const api = createFixtureApi()
     const listed = await api.workspace.list(req({}))

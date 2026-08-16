@@ -18,8 +18,9 @@ async function bench() {
   const slots = ctx.get('slots') as SlotRegistry
   ctx.provide('locale', new LocaleRuntime(ctx))
   const listTreeEntries = vi.fn(async (path: string) => ({ path, entries: [], truncated: false }))
-  ctx.provide('workspaces', { listTreeEntries })
-  return { ctx, slots, listTreeEntries }
+  const gitStatus = vi.fn(async (_path: string) => ({ root: '', entries: [] }))
+  ctx.provide('workspaces', { listTreeEntries, gitStatus })
+  return { ctx, slots, listTreeEntries, gitStatus }
 }
 
 describe('ui-project browser apply', () => {
@@ -78,6 +79,8 @@ describe('ui-project browser apply', () => {
     const signal = new AbortController().signal
     await injected.listTreeEntries('/w', signal)
     expect(b.listTreeEntries).toHaveBeenCalledWith('/w', signal)
+    await injected.gitStatus('/w', signal)
+    expect(b.gitStatus).toHaveBeenCalledWith('/w', signal)
     injected.openDocument('/w/a.ts')
     expect(open).toHaveBeenCalledWith('/w/a.ts')
     injected.toggleColumn()

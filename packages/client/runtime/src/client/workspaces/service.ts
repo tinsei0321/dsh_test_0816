@@ -8,7 +8,7 @@ import type {
 import type { SnapshotStore } from '../contract/store.ts'
 import { createSnapshotStore } from '../contract/store.ts'
 import type { SessionsPort, SessionsPortList } from '../contract/sessions-port.ts'
-import type { IWorkspaces } from '../contract/workspaces.ts'
+import type { GitStatusListing, IWorkspaces } from '../contract/workspaces.ts'
 import { WorkspaceManager, type WorkspaceListPhase } from './manager.ts'
 
 /** Workspace list plus the two-baseline readiness and default-target projection. */
@@ -251,6 +251,20 @@ export class WorkspaceRuntime implements IWorkspaces {
     const response = await this.api.host.readText({ path }, signal)
     if (!response.result.ok) throw new DirectoryBrowseError(response.result.error)
     return response.result.value.content
+  }
+
+  /**
+   * Read one repository working tree's git decoration status through the
+   * Host's `browse` capability (decorative tree status). An empty listing
+   * means the path is not a git repository or git is unavailable.
+   * @param path - absolute repository (or in-repo) path to query.
+   * @param signal - aborts the wire request (and the Host's scan) when the caller supersedes it.
+   * @returns the repository root and its decorated entries.
+   */
+  async gitStatus(path: string, signal?: AbortSignal): Promise<GitStatusListing> {
+    const response = await this.api.host.gitStatus({ path }, signal)
+    if (!response.result.ok) throw new DirectoryBrowseError(response.result.error)
+    return response.result.value
   }
 
   /**

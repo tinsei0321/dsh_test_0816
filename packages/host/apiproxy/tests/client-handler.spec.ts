@@ -80,6 +80,7 @@ function scriptedApi(overrides: {
       createDirectory: r => ok(r, { path: '/t/new' }),
       openPath: r => ok(r, { opened: true as const }),
       readText: r => ok(r, { content: '' }),
+      gitStatus: r => ok(r, { root: '', entries: [] }),
       ...overrides.host,
     },
     workspace: {

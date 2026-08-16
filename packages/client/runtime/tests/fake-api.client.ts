@@ -140,6 +140,12 @@ export class FakeApiClient implements IApiClient {
   onReadText: (payload: unknown) => Promise<RpcResponse<{ content: string }>> =
     () => Promise.resolve(ok({ content: '' }))
 
+  onGitStatus: (payload: unknown) => Promise<RpcResponse<{
+    root: string
+    entries: { path: string; status: 'M' | 'A' | 'D' | 'R' | 'C' | 'U' }[]
+  }>> =
+    () => Promise.resolve(ok({ root: '', entries: [] }))
+
   private readonly muxConns: StreamConn<MuxFrame>[] = []
   private readonly hostConns: StreamConn<HostFrame>[] = []
   lastSearchSignal: AbortSignal | undefined
@@ -196,6 +202,7 @@ export class FakeApiClient implements IApiClient {
     createDirectory: (payload: unknown) => this.record('host.createDirectory', payload, this.onCreateDirectory(payload)),
     openPath: (payload: unknown) => this.record('host.openPath', payload, this.onOpenPath(payload)),
     readText: (payload: unknown) => this.record('host.readText', payload, this.onReadText(payload)),
+    gitStatus: (payload: unknown) => this.record('host.gitStatus', payload, this.onGitStatus(payload)),
   }
 
   // The archive-set field defaults at the binding below so list stubs keep

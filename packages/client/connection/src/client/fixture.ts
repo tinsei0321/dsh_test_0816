@@ -2589,6 +2589,16 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
       },
       openPath: request => ok(request, { opened: true as const }),
       readText: request => ok(request, { content: `fixture content of ${request.payload.path}` }),
+      // Fixed small repo regardless of the requested path: the design-mock
+      // git status is one working tree with three decorated files.
+      gitStatus: request => ok(request, {
+        root: '/home/fixture/repo',
+        entries: [
+          { path: '/home/fixture/repo/src/modified.ts', status: 'M' as const },
+          { path: '/home/fixture/repo/new-file.md', status: 'U' as const },
+          { path: '/home/fixture/repo/gone.ts', status: 'D' as const },
+        ],
+      }),
     },
     workspace: {
       list: request => ok(request, {
@@ -3127,6 +3137,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'host.createDirectory': return this.api.host.createDirectory(request)
       case 'host.openPath': return this.api.host.openPath(request, new AbortController().signal)
       case 'host.readText': return this.api.host.readText(request, new AbortController().signal)
+      case 'host.gitStatus': return this.api.host.gitStatus(request, new AbortController().signal)
       case 'workspace.list': return this.api.workspace.list(request)
       case 'workspace.create': return this.api.workspace.create(request)
       case 'workspace.rename': return this.api.workspace.rename(request)

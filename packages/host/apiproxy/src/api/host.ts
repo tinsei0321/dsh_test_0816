@@ -57,6 +57,25 @@ export interface TreeListing {
 }
 /* jscpd:ignore-end */
 
+/** Git decoration letters (VS Code SCM semantics). */
+export type GitStatusLetter = 'M' | 'A' | 'D' | 'R' | 'C' | 'U'
+
+/** One git-status record: absolute file path → decoration letter. */
+export interface GitStatusEntry {
+  /** Absolute path of the changed file. */
+  path: string
+  /** Decoration letter for the entry. */
+  status: GitStatusLetter
+}
+
+/** host.gitStatus response value. */
+export interface GitStatusListing {
+  /** Absolute git repository root (empty when the root is not a repository). */
+  root: string
+  /** Changed files with their decoration letters. */
+  entries: GitStatusEntry[]
+}
+
 /** Host-level unary methods. */
 export interface HostApi {
   /**
@@ -141,4 +160,15 @@ export interface HostApi {
     request: RpcRequest<{ path: string }>,
     signal: AbortSignal,
   ): Promise<RpcResponse<{ content: string }>>
+
+  /**
+   * Report git working-tree status for the project directory tree (VS Code SCM
+   * decoration letters). Decorative: a non-repository root or a missing git
+   * binary resolves to an empty listing; the caller's abort propagates as
+   * `cancelled`. Served independently of the directory picker.
+   */
+  gitStatus(
+    request: RpcRequest<{ path: string }>,
+    signal: AbortSignal,
+  ): Promise<RpcResponse<GitStatusListing>>
 }

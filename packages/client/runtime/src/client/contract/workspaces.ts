@@ -10,6 +10,25 @@ import type { DirectoryListing, SessionId, TreeListing, WorkspaceId, WorkspaceVi
 import type { WorkspaceListState } from '../workspaces/service.ts'
 import type { ObservableSnapshot } from './store.ts'
 
+/** Git decoration letters (VS Code SCM semantics). */
+export type GitStatusLetter = 'M' | 'A' | 'D' | 'R' | 'C' | 'U'
+
+/** One git-status record: absolute file path → decoration letter. */
+export interface GitStatusEntry {
+  /** Absolute path of the decorated file. */
+  path: string
+  /** Decoration letter describing the file's working-tree change. */
+  status: GitStatusLetter
+}
+
+/** host.gitStatus response value. */
+export interface GitStatusListing {
+  /** Absolute path of the queried repository root. */
+  root: string
+  /** Decorated files in the repository's working tree. */
+  entries: GitStatusEntry[]
+}
+
 /** The workspaces-service face injected as `ctx.workspaces`. */
 export interface IWorkspaces {
   /** The useWorkspaces standard feed (read face — writes stay inside the domain). */
@@ -63,6 +82,15 @@ export interface IWorkspaces {
    * @returns the file's decoded UTF-8 content.
    */
   readText(path: string, signal?: AbortSignal): Promise<string>
+  /**
+   * Read one repository working tree's git decoration status through the
+   * Host's `browse` capability (decorative tree status). An empty listing
+   * means the path is not a git repository or git is unavailable.
+   * @param path - absolute repository (or in-repo) path to query.
+   * @param signal - aborts the wire request (and the Host's scan) when the caller supersedes it.
+   * @returns the repository root and its decorated entries.
+   */
+  gitStatus(path: string, signal?: AbortSignal): Promise<GitStatusListing>
   /**
    * Create one child directory through the Host's `browse` capability.
    * @param path - absolute existing parent directory.

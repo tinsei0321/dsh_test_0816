@@ -9,7 +9,7 @@ import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react
 import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  SessionId, SessionListState, TreeListing, WorkspaceId, WorkspaceListState,
+  GitStatusListing, SessionId, SessionListState, TreeListing, WorkspaceId, WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
@@ -59,6 +59,9 @@ function buildProps(path: string | null = '/w') {
   const listTreeEntries = vi.fn<(path: string, signal: AbortSignal) => Promise<TreeListing>>()
   const openDocument = vi.fn<(path: string) => void>()
   const collapseColumn = vi.fn<() => void>()
+  const gitStatus = vi.fn<(path: string, signal: AbortSignal) => Promise<GitStatusListing>>(
+    async () => ({ root: '', entries: [] }),
+  )
   const props: ProjectTreeProps = {
     collapsed: false,
     width: 240,
@@ -68,10 +71,11 @@ function buildProps(path: string | null = '/w') {
     actions: store.actions,
     listTreeEntries,
     openDocument,
+    gitStatus,
     toggleColumn: collapseColumn,
     t: makeTranslate(zh, commonZh),
   }
-  return { props, workspaces, sessions, listTreeEntries, openDocument, collapseColumn }
+  return { props, workspaces, sessions, listTreeEntries, openDocument, collapseColumn, gitStatus }
 }
 
 afterEach(() => { cleanup() })
@@ -253,5 +257,64 @@ describe('ProjectTree', () => {
     fireEvent.click(view.getByRole('button', { name: /展开/ }))
     await view.findByText('README.md')
     expect(b.listTreeEntries.mock.calls.length).toBe(calls)
+  })
+
+  it('fetches the git status once per root and renders colored dots on changed files', async () => {
+    const b = buildProps()
+    b.listTreeEntries.mockResolvedValue({
+      path: '/w',
+      entries: [DIR, FILE, { name: 'new.ts', path: '/w/new.ts', kind: 'file' as const, hidden: false }],
+      truncated: false,
+    })
+    b.gitStatus.mockResolvedValue({
+      root: '/w',
+      entries: [
+        { path: '/w/README.md', status: 'M' },
+        { path: '/w/new.ts', status: 'U' },
+      ],
+    })
+    const view = render(<ProjectTree {...b.props} />)
+    await view.findByText('README.md')
+    expect(b.gitStatus).toHaveBeenCalledWith('/w', expect.anything())
+    // Changed files carry their letter dot with the localized status label.
+    const modified = view.getByLabelText('已修改')
+    expect(modified.getAttribute('data-status')).toBe('M')
+    expect(modified.closest('button')?.textContent).toContain('README.md')
+    expect(view.getByLabelText('未跟踪').getAttribute('data-status')).toBe('U')
+    // A directory row never carries a dot.
+    expect(view.container.querySelectorAll('[data-status]')).toHaveLength(2)
+  })
+
+  it('a failed git scan settles as no dots (decorative feature)', async () => {
+    const b = buildProps()
+    b.listTreeEntries.mockResolvedValue({ path: '/w', entries: [FILE], truncated: false })
+    b.gitStatus.mockRejectedValue(new Error('no git'))
+    const view = render(<ProjectTree {...b.props} />)
+    await view.findByText('README.md')
+    expect(view.container.querySelectorAll('[data-status]')).toHaveLength(0)
+  })
+
+  it('aborts a superseded git scan when the root changes and drops its late settle', async () => {
+    const b = buildProps()
+    b.listTreeEntries.mockImplementation(async (path: string) => {
+      if (path === '/w') return { path, entries: [FILE], truncated: false }
+      if (path === '/w2') return {
+        path,
+        entries: [{ name: 'main.ts', path: '/w2/main.ts', kind: 'file' as const, hidden: false }],
+        truncated: false,
+      }
+      throw new Error(`unexpected path ${path}`)
+    })
+    let staleResolve!: (listing: GitStatusListing) => void
+    b.gitStatus.mockImplementation((_path: string) => new Promise((resolve) => { staleResolve = resolve }))
+    const view = render(<ProjectTree {...b.props} />)
+    await view.findByText('README.md')
+    act(() => { b.workspaces.set(workspacesState('/w2')) })
+    await view.findByText('main.ts')
+    // The stale scan settles after the switch: its aborted signal drops it.
+    await act(async () => {
+      staleResolve({ root: '/w', entries: [{ path: '/w/README.md', status: 'M' }] })
+    })
+    expect(view.container.querySelectorAll('[data-status]')).toHaveLength(0)
   })
 })

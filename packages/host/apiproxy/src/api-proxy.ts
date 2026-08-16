@@ -110,6 +110,7 @@ import {
   inspectApiRemoteSession,
 } from '@deepseek-ai/dsh-api-remotes'
 import { canOpenNativePath, openNativePath, openNativeTextFile } from './native-path-opener.ts'
+import { runGitStatus } from './git-status.ts'
 
 /** Page size when history is called without maxMessages. */
 const DEFAULT_MAX_MESSAGES = 50
@@ -3010,6 +3011,21 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       async readText(request, signal) {
         return runBrowseListing(ctx, request, 'host.readText', signal, capability => capability.readText(request.payload.path, signal))
+      },
+
+      async gitStatus(request, signal) {
+        try {
+          return ok(request, await runGitStatus(request.payload.path, signal))
+        } catch (error: unknown) {
+          if (signal.aborted) {
+            return err(request, { code: 'cancelled', message: 'git status was aborted', details: {} })
+          }
+          return err(request, {
+            code: 'internal',
+            message: `git status failed: ${error instanceof Error ? error.message : String(error)}`,
+            details: {},
+          })
+        }
       },
 
       async createDirectory(request) {

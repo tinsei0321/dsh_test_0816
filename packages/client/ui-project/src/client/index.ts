@@ -5,8 +5,10 @@
  * details column's document reader. Directory rows expand one lazy level at a
  * time through the runtime's `workspaces.listTreeEntries`; file rows open the
  * document reader through ui-conversation's optional `documentOpen` service
- * (absent provider = clicking does nothing, like every other consumer). The
- * column collapse toggle drives the layout service. Composing this plugin out
+ * (absent provider = clicking does nothing, like every other consumer), and
+ * carry a colored status dot from the repository's git working-tree status
+ * (VS Code SCM semantics, `workspaces.gitStatus`). The column collapse toggle
+ * drives the layout service. Composing this plugin out
  * of cordis.yml leaves the column empty at zero cost.
  */
 import type { ClientContext, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
@@ -51,6 +53,7 @@ export function apply(ctx: ClientContext): void {
   const injected = (): ProjectTreeInjected => ({
     listTreeEntries: (path, signal) => ctx.workspaces.listTreeEntries(path, signal),
     openDocument: (path) => { ctx.get('documentOpen')?.open(path) },
+    gitStatus: (path, signal) => ctx.workspaces.gitStatus(path, signal),
     toggleColumn: () => { ctx.get('layout')?.toggleTree() },
   })
   ctx.slots.inject(

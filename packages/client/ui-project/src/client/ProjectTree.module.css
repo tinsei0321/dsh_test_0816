@@ -163,6 +163,38 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+/* Git status dot (VS Code SCM semantics): one color per decoration letter,
+   rendered in front of the file name. Renames carry the added green — the
+   new path is what the tree shows. */
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--dsw-alias-label-tertiary);
+}
+
+.dot[data-status='M'] {
+  background: var(--dsw-alias-scm-modified);
+}
+
+.dot[data-status='A'],
+.dot[data-status='R'] {
+  background: var(--dsw-alias-scm-added);
+}
+
+.dot[data-status='U'] {
+  background: var(--dsw-alias-scm-untracked);
+}
+
+.dot[data-status='D'] {
+  background: var(--dsw-alias-scm-deleted);
+}
+
+.dot[data-status='C'] {
+  background: var(--dsw-alias-scm-conflict);
+}
+
 .name {
   min-width: 0;
   overflow: hidden;

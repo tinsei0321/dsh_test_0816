@@ -369,6 +369,26 @@ describe('WorkspaceRuntime', () => {
     await expect(failure).rejects.toMatchObject({ rpcError: { code: 'directory-unreadable' } })
   })
 
+  it('passes git status through the browse wire, wrapping business failures', async () => {
+    const ctx = new Context()
+    const api = new FakeApiClient()
+    const workspaces = new WorkspaceRuntime(ctx, api, new SessionRuntime(ctx, api, fakeRemote()))
+    const listing = {
+      root: '/home/u',
+      entries: [
+        { path: '/home/u/src/modified.ts', status: 'M' as const },
+        { path: '/home/u/new-file.md', status: 'U' as const },
+      ],
+    }
+    api.onGitStatus = () => Promise.resolve(ok(listing))
+    await expect(workspaces.gitStatus('/home/u')).resolves.toEqual(listing)
+    expect(api.callsOf('host.gitStatus')).toEqual([{ path: '/home/u' }])
+    api.onGitStatus = () => Promise.resolve(err({ code: 'directory-unreadable', message: 'denied', details: { path: '/x' } }))
+    const failure = workspaces.gitStatus('/x')
+    await expect(failure).rejects.toBeInstanceOf(DirectoryBrowseError)
+    await expect(failure).rejects.toMatchObject({ rpcError: { code: 'directory-unreadable' } })
+  })
+
   it('opens a filesystem path through the host without local state', async () => {
     const ctx = new Context()
     const api = new FakeApiClient()

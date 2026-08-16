@@ -20,10 +20,21 @@ import {
   IconChevronDownOutline14, IconChevronRightOutline14,
   IconCloseFill14, IconFolderClose16, IconFolderOpen16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { TreeEntry } from '@deepseek-ai/dsh-client-runtime/client'
+import type { GitStatusLetter, TreeEntry } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ProjectTreeProps } from './contract/slots.ts'
+import type { ProjectKey } from './locales.ts'
 import { currentWorkspacePath } from './current-workspace.ts'
 import css from './ProjectTree.module.css'
+
+/** Locale keys of the git decoration letters (VS Code SCM semantics). */
+const STATUS_LABELS: Record<GitStatusLetter, ProjectKey> = {
+  M: 'project.status.M',
+  A: 'project.status.A',
+  D: 'project.status.D',
+  R: 'project.status.R',
+  C: 'project.status.C',
+  U: 'project.status.U',
+}
 
 /** Base name of a host path (the root row's label). */
 export function baseNameOf(path: string): string {
@@ -43,6 +54,7 @@ export function ProjectTree({
   actions,
   listTreeEntries,
   openDocument,
+  gitStatus,
   toggleColumn,
   t,
 }: ProjectTreeProps) {
@@ -55,6 +67,7 @@ export function ProjectTree({
   const statuses = useStore(s => s.statuses)
   const selectedPath = useStore(s => s.selectedPath)
   const showHidden = useStore(s => s.showHidden)
+  const gitStatuses = useStore(s => s.gitStatuses)
 
   // In-flight loads by directory path. Component-private: the map dies with
   // the tree (rail collapse), while the store carries the settled facts.
@@ -97,6 +110,27 @@ export function ProjectTree({
       launch(rootPath)
     }
   }, [rootPath, storeRoot, actions, listTreeEntries])
+
+  // Git decorations (the VS Code-style status dots): one scan per root. A
+  // superseded scan aborts; an absent repository, missing git, or wire
+  // failure settles as no decorations (the dots simply stay absent).
+  const gitController = useRef<AbortController | null>(null)
+  useEffect(() => {
+    if (storeRoot !== rootPath) return
+    gitController.current?.abort()
+    const controller = new AbortController()
+    gitController.current = controller
+    if (rootPath === null) return
+    gitStatus(rootPath, controller.signal).then(
+      (listing) => {
+        if (controller.signal.aborted) return
+        actions.setGitStatuses(listing.entries)
+      },
+      () => {
+        // Decorative feature: any failure means no dots.
+      },
+    )
+  }, [rootPath, storeRoot, actions, gitStatus])
 
   const toggle = (path: string): void => {
     if (expanded.includes(path)) {
@@ -171,27 +205,39 @@ export function ProjectTree({
     )
   }
 
-  const renderFileRow = (entry: TreeEntry): ReactNode => (
-    <div
-      key={entry.path}
-      role="treeitem"
-      aria-selected={selectedPath === entry.path}
-      className={clsx(selectedPath === entry.path && css.selectedItem)}
-    >
-      <button
-        type="button"
-        className={css.row}
-        aria-label={t('project.open', { name: entry.name })}
-        onClick={() => {
-          actions.select(entry.path)
-          openDocument(entry.path)
-        }}
+  const renderFileRow = (entry: TreeEntry): ReactNode => {
+    const letter = gitStatuses[entry.path]
+    return (
+      <div
+        key={entry.path}
+        role="treeitem"
+        aria-selected={selectedPath === entry.path}
+        className={clsx(selectedPath === entry.path && css.selectedItem)}
       >
-        <span className={css.chevron} aria-hidden="true" />
-        <span className={css.name}>{entry.name}</span>
-      </button>
-    </div>
-  )
+        <button
+          type="button"
+          className={css.row}
+          aria-label={t('project.open', { name: entry.name })}
+          onClick={() => {
+            actions.select(entry.path)
+            openDocument(entry.path)
+          }}
+        >
+          <span className={css.chevron} aria-hidden="true" />
+          {letter !== undefined && (
+            <span
+              className={css.dot}
+              data-status={letter}
+              role="img"
+              title={t(STATUS_LABELS[letter])}
+              aria-label={t(STATUS_LABELS[letter])}
+            />
+          )}
+          <span className={css.name}>{entry.name}</span>
+        </button>
+      </div>
+    )
+  }
 
   const rootExpanded = rootPath !== null && expanded.includes(rootPath)
 

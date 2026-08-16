@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
 import type { Agent, AgentFactory } from '@deepseek-ai/dsh-agent'
@@ -18,6 +18,17 @@ import type { RpcRequest, RpcResponse } from '@deepseek-ai/dsh-host-apiproxy/api
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
 import { MemoryStorageBackend } from '../../../storage/storage-domain/tests/helpers/memory-backend.ts'
+
+const { runGitStatusMock } = vi.hoisted(() => ({
+  runGitStatusMock: vi.fn<
+    (root: string, signal?: AbortSignal) => Promise<{
+      root: string
+      entries: Array<{ path: string; status: 'M' | 'A' | 'D' | 'R' | 'C' | 'U' }>
+    }>
+  >(),
+}))
+
+vi.mock('../src/git-status.ts', () => ({ runGitStatus: runGitStatusMock }))
 
 let nextRpc = 1
 
@@ -289,6 +300,53 @@ describe('host.listTreeEntries', () => {
     const { api } = await harness()
     expect((await api.host.listTreeEntries(request({ path: '/x' }), new AbortController().signal)).result).toMatchObject({
       ok: false, error: { code: 'directory-picker-unavailable', details: { capability: 'native' } },
+    })
+  })
+})
+
+describe('host.gitStatus', () => {
+  beforeEach(() => {
+    runGitStatusMock.mockReset()
+  })
+
+  it('serves the decorated listing from the git runner', async () => {
+    runGitStatusMock.mockResolvedValue({
+      root: '/repo',
+      entries: [{ path: '/repo/src/a.ts', status: 'M' }],
+    })
+    const { api } = await harness()
+    const signal = new AbortController().signal
+    const response = await api.host.gitStatus(request({ path: '/repo' }), signal)
+    expect(response.result).toEqual({
+      ok: true,
+      value: { root: '/repo', entries: [{ path: '/repo/src/a.ts', status: 'M' }] },
+    })
+    expect(runGitStatusMock).toHaveBeenCalledWith('/repo', signal)
+  })
+
+  it('returns an empty listing when the root is not a repository', async () => {
+    runGitStatusMock.mockResolvedValue({ root: '', entries: [] })
+    const { api } = await harness()
+    const response = await api.host.gitStatus(request({ path: '/not-repo' }), new AbortController().signal)
+    expect(response.result).toEqual({ ok: true, value: { root: '', entries: [] } })
+  })
+
+  it('maps a caller abort to a cancelled error', async () => {
+    runGitStatusMock.mockRejectedValue(new Error('aborted'))
+    const { api } = await harness()
+    const abort = new AbortController()
+    const pending = api.host.gitStatus(request({ path: '/repo' }), abort.signal)
+    abort.abort()
+    expect((await pending).result).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+  })
+
+  it('folds a runner failure into an internal error', async () => {
+    runGitStatusMock.mockRejectedValue(new Error('git crashed'))
+    const { api } = await harness()
+    const response = await api.host.gitStatus(request({ path: '/repo' }), new AbortController().signal)
+    expect(response.result).toMatchObject({
+      ok: false,
+      error: { code: 'internal', message: 'git status failed: git crashed' },
     })
   })
 })

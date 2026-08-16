@@ -1,7 +1,7 @@
 /** Test-owned workspaces face: the renderer standard-kit observable plus recorded actions. */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
-  DirectoryListing, IWorkspaces, SessionId, SnapshotStore, TreeListing, WorkspaceId, WorkspaceListState, WorkspaceView,
+  DirectoryListing, GitStatusListing, IWorkspaces, SessionId, SnapshotStore, TreeListing, WorkspaceId, WorkspaceListState, WorkspaceView,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { workspaceListState } from './fixtures.ts'
 import type { Stabilizer } from './fixtures.ts'
@@ -149,6 +149,20 @@ export class TestWorkspaces implements IWorkspaces {
     const stub = this.stubs.get('listTreeEntries')
     if (stub !== undefined) return await (stub(path, signal) as Promise<TreeListing>)
     return { path, entries: [], truncated: false }
+  }
+
+  /**
+   * Git decoration status read (recorded). The default serves an empty
+   * listing; stub to shape a repository.
+   * @param path - absolute repository (or in-repo) path to query.
+   * @param signal - caller lifetime; recorded and forwarded like the production face.
+   * @returns the repository root and its decorated entries.
+   */
+  async gitStatus(path: string, signal?: AbortSignal): Promise<GitStatusListing> {
+    this.calls.push({ method: 'gitStatus', args: [path, signal] })
+    const stub = this.stubs.get('gitStatus')
+    if (stub !== undefined) return await (stub(path, signal) as Promise<GitStatusListing>)
+    return { root: '', entries: [] }
   }
 
   /**

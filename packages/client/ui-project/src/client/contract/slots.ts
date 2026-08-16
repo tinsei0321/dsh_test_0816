@@ -11,7 +11,7 @@
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls the SlotMap merge declaring the frame's project-tree column.
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
-import type { TreeListing } from '@deepseek-ai/dsh-client-runtime/client'
+import type { GitStatusListing, TreeListing } from '@deepseek-ai/dsh-client-runtime/client'
 import type { createProjectTreeStore } from '../stores.ts'
 
 /**
@@ -41,6 +41,14 @@ export type ProjectTreeInjected = {
   listTreeEntries: (path: string, signal: AbortSignal) => Promise<TreeListing>
   /** Open a file in the details column's document view (no-op without the provider). */
   openDocument: (path: string) => void
+  /**
+   * Fetch the repository's git working-tree status for the tree root (the
+   * VS Code-style colored status dots). An empty listing means the root is
+   * not in a git repository or git is unavailable.
+   * @param path - the tree root to scan.
+   * @param signal - aborts the wire request (and the Host's git run) when the caller supersedes it.
+   */
+  gitStatus: (path: string, signal: AbortSignal) => Promise<GitStatusListing>
   /** Toggle the tree column (the header ✕ and the collapsed rail's re-open button). */
   toggleColumn: () => void
 }

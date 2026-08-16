@@ -17,6 +17,7 @@ import {
 import {
   hostCreateDirectoryRequestSchema, hostCreateDirectoryValueSchema,
   hostDescribeRequestSchema, hostDescribeValueSchema,
+  hostGitStatusRequestSchema, hostGitStatusValueSchema,
   hostListDirectoryRequestSchema, hostListDirectoryValueSchema,
   hostListTreeEntriesRequestSchema, hostListTreeEntriesValueSchema,
 } from '../src/api/host.schema.ts'
@@ -364,6 +365,28 @@ describe('host domain schemas', () => {
       path: '/x', entries: [{ name: 'a', path: '/x/a', kind: 'socket', hidden: false }], truncated: false,
     })).toThrow()
     expect(() => hostListTreeEntriesValueSchema.parse({ path: '/x', entries: [] })).toThrow()
+  })
+
+  it('validates the git-status payload and value', () => {
+    expect(hostGitStatusRequestSchema.parse({ path: '/home/u/p' })).toEqual({ path: '/home/u/p' })
+    // The tree's root is caller-owned: the path is required, never defaulted.
+    expect(() => hostGitStatusRequestSchema.parse({})).toThrow()
+    expect(() => hostGitStatusRequestSchema.parse({ path: '' })).toThrow()
+    const value = hostGitStatusValueSchema.parse({
+      root: '/repo',
+      entries: [
+        { path: '/repo/src/a.ts', status: 'M' },
+        { path: '/repo/new.txt', status: 'U' },
+      ],
+    })
+    expect(value.entries.map(entry => entry.status)).toEqual(['M', 'U'])
+    // The empty listing (non-repository or missing git) is a valid value.
+    expect(hostGitStatusValueSchema.parse({ root: '', entries: [] })).toEqual({ root: '', entries: [] })
+    // Status letters are a closed wire enumeration.
+    expect(() => hostGitStatusValueSchema.parse({
+      root: '/repo', entries: [{ path: '/repo/a.ts', status: 'X' }],
+    })).toThrow()
+    expect(() => hostGitStatusValueSchema.parse({ root: '/repo' })).toThrow()
   })
 })
 

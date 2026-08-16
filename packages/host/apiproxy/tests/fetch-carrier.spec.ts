@@ -175,6 +175,15 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       async readText(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { content: '' } } }
       },
+      async gitStatus(request) {
+        return {
+          rpcId: request.rpcId,
+          result: {
+            ok: true,
+            value: { root: '/w', entries: [{ path: '/w/README.md', status: 'M' }] },
+          },
+        }
+      },
     },
     workspace: {
       async list(request) {
@@ -438,6 +447,15 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
         entries: [{ name: 'README.md', path: '/w/README.md', kind: 'file', hidden: false }],
         truncated: false,
       },
+    })
+  })
+
+  it('round-trips the git status call through the wire form', async () => {
+    const c = client()
+    const status = await c.host.gitStatus({ path: '/w' })
+    expect(status.result).toEqual({
+      ok: true,
+      value: { root: '/w', entries: [{ path: '/w/README.md', status: 'M' }] },
     })
   })
 

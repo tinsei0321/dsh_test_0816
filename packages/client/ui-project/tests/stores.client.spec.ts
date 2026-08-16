@@ -14,6 +14,7 @@ describe('createProjectTreeStore', () => {
       expanded: [],
       selectedPath: null,
       showHidden: false,
+      gitStatuses: {},
     })
   })
 
@@ -25,6 +26,7 @@ describe('createProjectTreeStore', () => {
     store.actions.setLevel('/w', [TREE_ENTRY], false)
     store.actions.select('/w/src')
     store.actions.setShowHidden(true)
+    store.actions.setGitStatuses([{ path: '/w/a.ts', status: 'M' }])
     store.actions.setRoot('/w2')
     expect(store.getSnapshot()).toEqual({
       rootPath: '/w2',
@@ -33,6 +35,7 @@ describe('createProjectTreeStore', () => {
       expanded: [],
       selectedPath: null,
       showHidden: true,
+      gitStatuses: {},
     })
   })
 
@@ -72,5 +75,17 @@ describe('createProjectTreeStore', () => {
     expect(store.getSnapshot().selectedPath).toBeNull()
     store.actions.setShowHidden(true)
     expect(store.getSnapshot().showHidden).toBe(true)
+  })
+
+  it('setGitStatuses replaces the decoration set wholesale', () => {
+    const store = createProjectTreeStore().create()
+    store.actions.setGitStatuses([
+      { path: '/w/a.ts', status: 'M' },
+      { path: '/w/b.ts', status: 'U' },
+    ])
+    expect(store.getSnapshot().gitStatuses).toEqual({ '/w/a.ts': 'M', '/w/b.ts': 'U' })
+    // The next scan replaces the previous set instead of merging into it.
+    store.actions.setGitStatuses([{ path: '/w/b.ts', status: 'D' }])
+    expect(store.getSnapshot().gitStatuses).toEqual({ '/w/b.ts': 'D' })
   })
 })

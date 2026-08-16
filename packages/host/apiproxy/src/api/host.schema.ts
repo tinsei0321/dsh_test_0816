@@ -102,3 +102,17 @@ export const hostReadTextRequestSchema = z.object({
 export const hostReadTextValueSchema = z.object({
   content: z.string(),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.readText'>>>
+
+/** host.gitStatus request payload; the tree root is required. */
+export const hostGitStatusRequestSchema = z.object({
+  path: z.string().min(1),
+}) satisfies z.ZodType<Wire<RequestPayload<'host.gitStatus'>>>
+
+/** host.gitStatus response value. */
+export const hostGitStatusValueSchema = z.object({
+  root: z.string(),
+  entries: z.array(z.object({
+    path: z.string(),
+    status: z.enum(['M', 'A', 'D', 'R', 'C', 'U']),
+  })),
+}) satisfies z.ZodType<Wire<ResponseValue<'host.gitStatus'>>>

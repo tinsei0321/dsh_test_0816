@@ -18,6 +18,12 @@ export const zh = {
   'project.showHidden': '显示隐藏文件',
   'project.collapseColumn': '收起文件栏',
   'project.expandColumn': '展开文件栏',
+  'project.status.M': '已修改',
+  'project.status.A': '已添加',
+  'project.status.D': '已删除',
+  'project.status.R': '已重命名',
+  'project.status.C': '冲突',
+  'project.status.U': '未跟踪',
 }
 
 /** English dictionary (same key set). */
@@ -35,6 +41,12 @@ export const en: Record<ProjectKey, string> = {
   'project.showHidden': 'Show hidden files',
   'project.collapseColumn': 'Collapse file panel',
   'project.expandColumn': 'Expand file panel',
+  'project.status.M': 'Modified',
+  'project.status.A': 'Added',
+  'project.status.D': 'Deleted',
+  'project.status.R': 'Renamed',
+  'project.status.C': 'Conflict',
+  'project.status.U': 'Untracked',
 }
 
 /** Union of this namespace's dictionary keys. */
