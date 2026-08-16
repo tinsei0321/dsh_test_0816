@@ -42,9 +42,13 @@
   border-left: 1px solid var(--dsw-alias-border-l2);
 }
 
-/* The rightmost column: the project directory tree, always present. */
+/* The rightmost column: the project directory tree, always present. A flex
+   column so the tree's own scroll container fills it edge-to-edge (the slot
+   outlet is display:contents, so the tree is a direct flex child here). */
 .treeCol {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: var(--dsw-alias-bg-layer-1);
   border-left: 1px solid var(--dsw-alias-border-l2);
@@ -56,15 +60,16 @@
   border-left: none;
 }
 
-/* Drag handles are frame children (columns clip overflow): an 8px hit strip
+/* Drag handles are frame children (columns clip overflow): a 12px hit strip
    centered on the column border via inline left, above column content. Details
-   adds a visible 12x32 pill at vertical center; sidebar keeps only the hit strip. */
+   and tree add a visible 12x32 pill at vertical center; sidebar keeps only the
+   hit strip. */
 .handle {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 8px;
-  margin-left: -4px;
+  width: 12px;
+  margin-left: -6px;
   cursor: col-resize;
   z-index: 2;
   touch-action: none;

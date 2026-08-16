@@ -9,10 +9,12 @@
  * and the wire face arrives through the inject share. In-flight loads are
  * canceled when a level collapses or the root changes; a load that outlives
  * a rail collapse settles into the store harmlessly (the store survives
- * remounts).
+ * remounts). Children render as nested `role="group"` levels, each carrying
+ * a vertical guide line (the folder-tree "line" look) instead of flat
+ * indent paddings.
  */
 import { useEffect, useMemo, useRef } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import {
   IconChevronDownOutline14, IconChevronRightOutline14,
@@ -106,20 +108,20 @@ export function ProjectTree({
     }
   }
 
-  /** The rows of one expanded level, indented below their directory row. */
-  const renderRows = (dir: string, depth: number): ReactNode => {
+  /** The rows of one expanded level, nested one guide-line level below their directory row. */
+  const renderRows = (dir: string): ReactNode => {
     const level = levels[dir]
     const rows: ReactNode[] = []
     if (level !== undefined) {
       const visible = showHidden ? level.entries : level.entries.filter(entry => !entry.hidden)
       for (const entry of visible) {
         rows.push(entry.kind === 'directory'
-          ? renderDirectoryRow(entry, depth)
-          : renderFileRow(entry, depth))
+          ? renderDirectoryRow(entry)
+          : renderFileRow(entry))
       }
       if (level.truncated) {
         rows.push(
-          <div key="truncated" role="none" className={css.truncated} style={{ '--depth': depth } as CSSProperties}>
+          <div key="truncated" role="none" className={css.truncated}>
             {t('project.truncated')}
           </div>,
         )
@@ -127,7 +129,7 @@ export function ProjectTree({
     }
     if (statuses[dir] === 'loading') {
       rows.push(
-        <div key="loading" role="none" className={css.status} style={{ '--depth': depth } as CSSProperties}>
+        <div key="loading" role="none" className={css.status}>
           {t('project.loading')}
         </div>,
       )
@@ -139,7 +141,6 @@ export function ProjectTree({
           type="button"
           role="treeitem"
           className={clsx(css.row, css.errorRow)}
-          style={{ '--depth': depth } as CSSProperties}
           onClick={() => { loadIfNeeded(dir) }}
         >
           {t('project.error')}
@@ -149,14 +150,13 @@ export function ProjectTree({
     return <div role="group">{rows}</div>
   }
 
-  const renderDirectoryRow = (entry: TreeEntry, depth: number): ReactNode => {
+  const renderDirectoryRow = (entry: TreeEntry): ReactNode => {
     const isExpanded = expanded.includes(entry.path)
     return (
       <div key={entry.path} role="treeitem" aria-expanded={isExpanded}>
         <button
           type="button"
           className={css.row}
-          style={{ '--depth': depth } as CSSProperties}
           aria-label={t('project.toggle', { name: entry.name, state: isExpanded ? t('project.collapse') : t('project.expand') })}
           onClick={() => { toggle(entry.path) }}
         >
@@ -166,12 +166,12 @@ export function ProjectTree({
           {isExpanded ? <IconFolderOpen16 className={css.folder} /> : <IconFolderClose16 className={css.folder} />}
           <span className={css.name}>{entry.name}</span>
         </button>
-        {isExpanded && renderRows(entry.path, depth + 1)}
+        {isExpanded && renderRows(entry.path)}
       </div>
     )
   }
 
-  const renderFileRow = (entry: TreeEntry, depth: number): ReactNode => (
+  const renderFileRow = (entry: TreeEntry): ReactNode => (
     <div
       key={entry.path}
       role="treeitem"
@@ -181,7 +181,6 @@ export function ProjectTree({
       <button
         type="button"
         className={css.row}
-        style={{ '--depth': depth } as CSSProperties}
         aria-label={t('project.open', { name: entry.name })}
         onClick={() => {
           actions.select(entry.path)
@@ -251,7 +250,7 @@ export function ProjectTree({
                 {rootExpanded ? <IconFolderOpen16 className={css.folder} /> : <IconFolderClose16 className={css.folder} />}
                 <span className={css.name}>{baseNameOf(rootPath)}</span>
               </button>
-              {rootExpanded && renderRows(rootPath, 1)}
+              {rootExpanded && renderRows(rootPath)}
             </div>
           </div>
         )}
