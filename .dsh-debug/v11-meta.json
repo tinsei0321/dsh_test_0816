@@ -1,0 +1,8 @@
+{
+  "name": "Usage Monitor v11 · 官方成本 stdin 直连",
+  "purpose": "官方 cost 请求改用 stdin 传配置（与余额一致），避免 Windows argv 空格转义问题，并回传失败原因。",
+  "plugin": {
+    "kind": "existing",
+    "pluginId": "usage-1"
+  }
+}

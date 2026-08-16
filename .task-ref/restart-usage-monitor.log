@@ -1,0 +1,19 @@
+2026-08-16 19:44:22 restart scheduled; sleeping 45s for the finishing turn to settle
+2026-08-16 19:45:08 stopping web server PID 34672
+2026-08-16 19:45:08 stopped
+2026-08-16 19:45:11 starting the fresh server on 3080 with the usage-monitor build
+2026-08-16 19:45:11 started pid 9788
+2026-08-16 19:45:18 probe @0s: not up yet
+2026-08-16 19:45:25 probe @5s: not up yet
+2026-08-16 19:45:32 probe @10s: not up yet
+2026-08-16 19:45:40 probe @15s: not up yet
+2026-08-16 19:45:47 probe @20s: not up yet
+2026-08-16 19:45:54 probe @25s: not up yet
+2026-08-16 19:46:01 probe @30s: not up yet
+2026-08-16 19:46:10 probe @35s: not up yet
+2026-08-16 19:46:19 probe @40s: not up yet
+2026-08-16 19:46:28 probe @45s: not up yet
+2026-08-16 19:46:37 probe @50s: not up yet
+2026-08-16 19:46:42 probe @55s: boot=True, usageMonitorBundle=True, session.list HTTP 200
+2026-08-16 19:46:42 restart verified: fresh 3080 serves the usage-monitor build with healthy session.list
+2026-08-16 19:46:42 script done

@@ -1,0 +1,20 @@
+2026-08-16 18:39:53 consolidation started; sleeping 20s for the finishing session to settle
+2026-08-16 18:40:13 stopping web server PID 12532
+2026-08-16 18:40:13 stopped
+2026-08-16 18:40:13 stopping web server PID 9764
+2026-08-16 18:40:14 stopped
+2026-08-16 18:40:17 starting the single fresh server on 3080
+2026-08-16 18:40:17 started pid 34672
+2026-08-16 18:40:24 probe @0s: not up yet
+2026-08-16 18:40:31 probe @5s: not up yet
+2026-08-16 18:40:38 probe @10s: not up yet
+2026-08-16 18:40:45 probe @15s: not up yet
+2026-08-16 18:40:52 probe @20s: not up yet
+2026-08-16 18:40:59 probe @25s: not up yet
+2026-08-16 18:41:08 probe @30s: not up yet
+2026-08-16 18:41:17 probe @35s: not up yet
+2026-08-16 18:41:26 probe @40s: not up yet
+2026-08-16 18:41:35 probe @45s: not up yet
+2026-08-16 18:41:40 probe @50s: boot=True, host.gitStatus HTTP 200
+2026-08-16 18:41:40 consolidation complete: single fresh 3080 serves the new build with host.gitStatus
+2026-08-16 18:41:40 script done

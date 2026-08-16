@@ -1,0 +1,39 @@
+ASSISTANT: 🎉 **推送完成！** 本地 `master` 与 Gitee 远端完全一致（`a913c9d44f`），共 **12 个提交**（你的 11 个 + 我的 1 个修复）全部到达 `https://gitee.com/tinsei0321/dsh_0816`。
+
+## 这轮做了什么
+
+**1. 修好 7 个 doc 门缺陷**（修复 commit：`chore: repair doc-sync gates after codex workbench commits`）：
+- 删除误提交进源码的 24 个编译产物（`.js/.map/.d.ts`）
+- 补全 5 处导出 JSDoc；`DocumentPanel`/`HeaderDocumentButton` 改为简单参数签名
+- `inject` 改为纯字面量数组；`documentOpen` 加入 cordis catalog 豁免表
+
+USER: "固化成正是插件包\n这样就能git？\n我到office环境下，是否通过gitee pull就能获取到带插件的版本了？"
+ASSISTANT: 先直接回答你的两个问题：
+
+## 1️⃣ 固化后能 git 吗？——能
+
+固化成正式插件包后，它就是仓库里的普通代码（host 包 + client 包 + bundle 注册行），和你的目录树/文档阅读功能一样走 commit → push Gitee。
+
+## 2️⃣ office 环境 gitee pull 能拿到带插件的版本吗？——能，而且是"永久版"
+
+office 机器只需要：
+
+```sh
+git pull
+pnpm install && pnpm run build
+pnpm dsh web
+```
+
+插件就**内建在 Web UI 里**了，重启不丢、不需要每次挂载——这正是动态插件做不到、正式插件包能做的。唯一仍要手动做的是**凭证**（`.credentials.yaml` 里放 API Key + 平台令牌，每台机器各自配置）。
+
+## 接下来的工作
+
+这是一次正经
+TOOL read -> D:\Github\dsh_test\packages\host\apiproxy\src\api\rpc-map.ts
+TOOL read -> D:\Github\dsh_test\packages\host\plugin-inventory\src\index.ts
+TOOL read -> D:\Github\dsh_test\packages\host\apiproxy\src\api\rpc.ts
+TOOL pwsh -> "===== plugin-inventory package.json ====="; Get-Content "D:\Github\dsh_test\packages\host\plugin-inventory\package.json" -Raw; "===== plugin-inventory tsdown ====="; Get-Content "D:\Github\dsh_test\p
+TOOL read -> D:\Github\dsh_test\packages\client\ui-settings-plugin-inventory\src\client\index.ts
+TOOL pwsh -> Get-ChildItem "D:\Github\dsh_test\packages\api\remotes\src" -Recurse -File | Select-Object -ExpandProperty FullName; "===== remotes index ====="; Get-Content "D:\Github\dsh_test\packages\api\remotes\s
+TOOL read -> D:\Github\dsh_test\packages\typert\protocol\src\index.ts
+TOOL read -> D:\Github\dsh_test\packages\api\remotes\src\client\index.ts
