@@ -26,9 +26,11 @@ interface SeriesDef {
   color: string
 }
 
+// The official DeepSeek platform's usage chart is drawn in the warm orange
+// ramp; the two tiers use a deep and a light orange.
 const COST_SERIES: readonly SeriesDef[] = [
-  { key: 'proCost', label: 'Pro', color: '#0C70F3' },
-  { key: 'flashCost', label: 'Flash', color: '#60B3FE' },
+  { key: 'proCost', label: 'Pro', color: '#FF8F1F' },
+  { key: 'flashCost', label: 'Flash', color: '#FFC46B' },
 ]
 
 const TIP_W = 208
